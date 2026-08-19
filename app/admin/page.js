@@ -481,8 +481,8 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       alert('Package Save Error: ' + err.message);
-    } finally {
-      setSavingPkg(false);
+    } finally { 
+      setSavingPkg(false); 
     }
   }
 
@@ -601,6 +601,8 @@ export default function AdminDashboard() {
       sellerMap[p.id] = {
         id: p.id,
         name: p.full_name || 'Seller',
+        email: p.email || 'No Email',
+        plan: p.plan || null,
         phone: realPhone || 'N/A',
         payment_method: realWalletNum ? `${walletMethod} (${realWalletNum})` : walletMethod,
         raw_bkash_number: realWalletNum,
@@ -621,6 +623,8 @@ export default function AdminDashboard() {
         sellerMap[sId] = {
           id: sId,
           name: profileInfo?.full_name || o.seller_name || 'Seller',
+          email: profileInfo?.email || 'No Email',
+          plan: profileInfo?.plan || null,
           phone: profileInfo?.phone || o.seller_phone || 'N/A',
           payment_method: bkashNumber ? `${walletMethod} (${bkashNumber})` : walletMethod,
           raw_bkash_number: bkashNumber,
@@ -663,7 +667,7 @@ export default function AdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             ⚡ Enterprise Admin Control Hub
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Order lifecycles, analytics, low stock alerts, packages, and payout management.</p>
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Order lifecycles, analytics, low stock alerts, packages, and reseller management.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
@@ -681,8 +685,9 @@ export default function AdminDashboard() {
             🚪 Logout
           </button>
 
+          {/* TAB BUTTONS (Updated to Resellers) */}
           <div className="grid grid-cols-3 sm:flex bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800/80 gap-1.5 w-full sm:w-auto">
-            {['overview', 'orders', 'payouts', 'inventory', 'packages'].map(tab => (
+            {['overview', 'orders', 'resellers', 'inventory', 'packages'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -690,7 +695,7 @@ export default function AdminDashboard() {
                   activeTab === tab ? 'bg-emerald-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-900/50 sm:bg-transparent'
                 }`}
               >
-                <span>{tab === 'payouts' ? '💳 Payouts' : tab === 'packages' ? '📦 Packages' : tab}</span>
+                <span>{tab === 'resellers' ? '👥 Resellers' : tab === 'packages' ? '📦 Packages' : tab}</span>
               </button>
             ))}
           </div>
@@ -819,15 +824,15 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* 💳 PAYOUTS TAB */}
-      {activeTab === 'payouts' && (
+      {/* 👥 RESELLERS HUB TAB */}
+      {activeTab === 'resellers' && (
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
-          <h2 className="text-base sm:text-lg font-bold text-white mb-1">Reseller Payout & Seller Hub</h2>
-          <p className="text-[11px] sm:text-xs text-slate-400 mb-4 sm:mb-6">Click on any seller to view their complete sales breakdown, history, and payout details.</p>
+          <h2 className="text-base sm:text-lg font-bold text-white mb-1">👥 Reseller Management & Seller Hub</h2>
+          <p className="text-[11px] sm:text-xs text-slate-400 mb-4 sm:mb-6">View registered sellers, membership status, sales breakdown, and manage accounts.</p>
 
           <div className="block md:hidden space-y-3">
             {sellersList.map((seller, idx) => (
-              <div key={seller.id} className={`p-3.5 bg-slate-950/80 border ${seller.is_banned ? 'border-rose-500/50' : 'border-slate-800'} rounded-2xl space-y-2`}>
+              <div key={seller.id} className={`p-3.5 bg-slate-950/80 border ${seller.is_banned ? 'border-rose-500/50' : 'border-slate-800'} rounded-2xl space-y-2.5`}>
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-[10px] font-mono bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-bold">Serial #{idx + 1}</span>
@@ -835,26 +840,43 @@ export default function AdminDashboard() {
                       {seller.name}
                       {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black">BANNED</span>}
                     </h4>
-                    <p className="text-[11px] text-slate-400">{seller.phone}</p>
+                    <p className="text-[11px] text-slate-300">{seller.email}</p>
+                    <p className="text-[10px] text-slate-500">{seller.phone}</p>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="uppercase text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/30">
-                      {seller.payment_method}
-                    </span>
-                    <button 
-                      onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
-                      className="bg-slate-800 hover:bg-slate-700 text-xs px-2 py-1 rounded-lg text-emerald-400 font-bold"
-                    >
-                      {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
-                    </button>
+                  
+                  {/* Status Badge */}
+                  <div>
+                    {seller.plan ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        {seller.plan}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        NO PLAN
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center pt-2 border-t border-slate-800/80 text-xs">
+                <div className="flex items-center justify-between gap-1.5 bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                  <span className="uppercase text-[10px] font-bold text-emerald-400">
+                    {seller.payment_method}
+                  </span>
+                  <button 
+                    onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
+                    className="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1 rounded-lg text-emerald-400 font-bold"
+                  >
+                    {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
+                  </button>
+                </div>
+
+                <div className="flex justify-between items-center pt-1 text-xs">
                   <span className="text-slate-400">Total Orders: <strong className="text-white">{seller.orders.length}</strong></span>
                   <button 
                     onClick={() => setSelectedSeller(seller)}
-                    className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs"
+                    className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs shadow"
                   >
                     📊 View Dashboard
                   </button>
@@ -868,8 +890,8 @@ export default function AdminDashboard() {
               <thead>
                 <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
                   <th className="p-3 w-16">Serial</th>
-                  <th className="p-3">Seller Name</th>
-                  <th className="p-3">Phone</th>
+                  <th className="p-3">Seller Name & Details</th>
+                  <th className="p-3">Membership Status</th>
                   <th className="p-3">Wallet / Bank Details</th>
                   <th className="p-3">Total Orders</th>
                   <th className="p-3 text-right">Dashboard Action</th>
@@ -882,11 +904,31 @@ export default function AdminDashboard() {
                   sellersList.map((seller, idx) => (
                     <tr key={seller.id} className={`hover:bg-slate-800/20 ${seller.is_banned ? 'bg-rose-950/10' : ''}`}>
                       <td className="p-3 font-mono font-bold text-emerald-400">#{idx + 1}</td>
-                      <td className="p-3 font-bold text-white text-sm flex items-center gap-2">
-                        {seller.name}
-                        {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black">BANNED</span>}
+                      
+                      <td className="p-3">
+                        <div className="font-bold text-white text-sm flex items-center gap-2">
+                          {seller.name}
+                          {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black">BANNED</span>}
+                        </div>
+                        <div className="text-slate-300 text-[11px]">{seller.email}</div>
+                        <div className="text-slate-500 text-[10px]">{seller.phone}</div>
                       </td>
-                      <td className="p-3 text-slate-400">{seller.phone}</td>
+
+                      {/* 🌟 MEMBERSHIP STATUS BADGE 🌟 */}
+                      <td className="p-3">
+                        {seller.plan ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            ACTIVE ({seller.plan})
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/30 tracking-wide">
+                            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                            NO PLAN (ONLY REGISTERED)
+                          </span>
+                        )}
+                      </td>
+
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <span className="uppercase font-bold text-emerald-400">{seller.payment_method}</span>
@@ -898,7 +940,9 @@ export default function AdminDashboard() {
                           </button>
                         </div>
                       </td>
+
                       <td className="p-3 font-semibold text-slate-200">{seller.orders.length} Orders</td>
+
                       <td className="p-3 text-right">
                         <button 
                           onClick={() => setSelectedSeller(seller)}
@@ -1266,7 +1310,7 @@ export default function AdminDashboard() {
                   📊 Seller Dashboard: {selectedSeller.name}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
-                  Phone: {selectedSeller.phone || 'N/A'} | Wallet Details: <strong className="text-emerald-400 uppercase">{selectedSeller.payment_method}</strong>
+                  Email: <span className="text-slate-200">{selectedSeller.email}</span> | Phone: {selectedSeller.phone || 'N/A'} | Wallet Details: <strong className="text-emerald-400 uppercase">{selectedSeller.payment_method}</strong>
                   <button 
                     onClick={() => handleCopyWallet(selectedSeller.raw_bkash_number || selectedSeller.payment_method, selectedSeller.id)}
                     className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] px-2.5 py-0.5 rounded-lg text-emerald-400 font-bold transition"
@@ -1484,7 +1528,7 @@ export default function AdminDashboard() {
                 </p>
                 <div className="flex gap-3 pt-1">
                   <button 
-                    type="button"
+                    type="button" 
                     onClick={() => handleApproveCancel(managingOrder.id)}
                     className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition shadow-md"
                   >
@@ -1503,7 +1547,7 @@ export default function AdminDashboard() {
                       onChange={(e) => setDeclineNoteInput(e.target.value)}
                     />
                     <button 
-                      type="button"
+                      type="button" 
                       onClick={() => handleDeclineCancel(managingOrder.id)}
                       className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0"
                     >
