@@ -71,7 +71,7 @@ export default function RegisterPage() {
             <input
               type="text"
               required
-              placeholder="e.g. BBC Beauty Care"
+              placeholder="e.g. John Ibrahim Khan"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
