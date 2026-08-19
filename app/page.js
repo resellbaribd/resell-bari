@@ -43,7 +43,7 @@ export default function HomePage() {
               href="/register"
               className="text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl transition shadow-md shadow-emerald-500/20"
             >
-              Reseller হন
+              Became a Reseller
             </Link>
           </div>
         </div>
