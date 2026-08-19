@@ -18,7 +18,6 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // 1. Sign up user via Supabase Auth
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -31,13 +30,12 @@ export default function RegisterPage() {
       const user = data?.user;
 
       if (user) {
-        // 2. Explicitly create profile entry directly from frontend (plan field is empty/null initially)
         const { error: profileError } = await supabase.from('profiles').upsert([
           {
             id: user.id,
             full_name: fullName,
             email: email,
-            plan: null, // নতুন রেজিস্ট্রেশনের সময় প্ল্যান খালি থাকবে
+            plan: null,
           }
         ]);
 
@@ -47,8 +45,6 @@ export default function RegisterPage() {
       }
 
       alert('Registration successful! Please log in to your account.');
-      
-      // রেজিস্ট্রেশনের পর সরাসরি লগইন পেজে রিডাইরেক্ট করা হবে
       router.push('/login');
       
     } catch (err) {
@@ -63,16 +59,16 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 font-sans">
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md space-y-6 shadow-2xl">
         
-        {/* 🌟 Resell Bari Logo (SVG) 🌟 */}
+        {/* 🌟 Brand Logo 🌟 */}
         <div className="flex justify-center mb-2">
           <Link href="/">
             <Image 
-              src="/logo.svg" 
-              alt="Resell Bari Logo" 
-              width={180} 
-              height={60} 
+              src="/icon.svg" 
+              alt="Resell Bari" 
+              width={70} 
+              height={70} 
               priority
-              className="h-auto w-auto max-h-16 object-contain cursor-pointer transition hover:opacity-90"
+              className="h-16 w-auto object-contain cursor-pointer transition hover:opacity-90"
             />
           </Link>
         </div>

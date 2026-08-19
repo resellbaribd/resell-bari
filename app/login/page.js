@@ -17,7 +17,6 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 1. Supabase Auth Sign In
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -27,14 +26,12 @@ export default function LoginPage() {
 
       const user = data.user;
 
-      // 🔴 2. DIRECT ADMIN OVERRIDE BY EMAIL
       if (user && user.email === 'admin@bbc.com') {
         alert('Admin Login Successful!');
         router.push('/admin');
         return;
       }
 
-      // 3. Fetch User Profile & Role from database for other users
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role, plan')
@@ -45,17 +42,14 @@ export default function LoginPage() {
         console.error('Profile fetch error:', profileError);
       }
 
-      // 4. Admin vs Reseller redirection based on DB role
       if (profile && profile.role === 'admin') {
         alert('Admin Login Successful!');
         router.push('/admin'); 
       } else {
-        // যদি প্ল্যান না থাকে বা null হয়, তবে অ্যাক্টিভেশন পেজে পাঠাবে
         if (!profile || !profile.plan) {
           alert('Login Successful! Please activate your membership plan.');
           router.push('/account-activation'); 
         } else {
-          // প্ল্যান কেনা থাকলে সরাসরি রিসেলার ড্যাশবোর্ডে পাঠাবে
           alert('Login Successful!');
           router.push('/reseller'); 
         }
@@ -73,16 +67,16 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 font-sans">
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md space-y-6 shadow-2xl">
         
-        {/* 🌟 Resell Bari Logo (SVG) 🌟 */}
+        {/* 🌟 Brand Logo 🌟 */}
         <div className="flex justify-center mb-2">
           <Link href="/">
             <Image 
-              src="/logo.svg" 
-              alt="Resell Bari Logo" 
-              width={180} 
-              height={60} 
+              src="/icon.svg" 
+              alt="Resell Bari" 
+              width={70} 
+              height={70} 
               priority
-              className="h-auto w-auto max-h-16 object-contain cursor-pointer transition hover:opacity-90"
+              className="h-16 w-auto object-contain cursor-pointer transition hover:opacity-90"
             />
           </Link>
         </div>
