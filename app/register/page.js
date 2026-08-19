@@ -57,19 +57,21 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 font-sans">
-      <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md space-y-6 shadow-2xl">
+      <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md space-y-6 shadow-2xl relative">
         
-        {/* 🌟 Brand Logo 🌟 */}
-        <div className="flex justify-center mb-2">
-          <Link href="/">
-            <Image 
-              src="/icon.svg" 
-              alt="Resell Bari" 
-              width={70} 
-              height={70} 
-              priority
-              className="h-16 w-auto object-contain cursor-pointer transition hover:opacity-90"
-            />
+        {/* 🌟 Premium White-Background Rounded Logo 🌟 */}
+        <div className="flex justify-center -mt-2 mb-2">
+          <Link href="/" className="group inline-block">
+            <div className="bg-white p-3.5 rounded-2xl shadow-xl shadow-emerald-500/10 border border-slate-100 flex items-center justify-center transition-all duration-300 transform group-hover:scale-105">
+              <Image 
+                src="/logo.svg" 
+                alt="Resell Bari" 
+                width={140} 
+                height={55} 
+                priority
+                className="h-12 md:h-14 w-auto object-contain"
+              />
+            </div>
           </Link>
         </div>
 
