@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -60,6 +62,21 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 font-sans">
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl w-full max-w-md space-y-6 shadow-2xl">
+        
+        {/* 🌟 Resell Bari Logo (SVG) 🌟 */}
+        <div className="flex justify-center mb-2">
+          <Link href="/">
+            <Image 
+              src="/logo.svg" 
+              alt="Resell Bari Logo" 
+              width={180} 
+              height={60} 
+              priority
+              className="h-auto w-auto max-h-16 object-contain cursor-pointer transition hover:opacity-90"
+            />
+          </Link>
+        </div>
+
         <div className="text-center">
           <h1 className="text-2xl font-extrabold text-white">🚀 Create Reseller Account</h1>
           <p className="text-xs text-slate-400 mt-1">Join our network and start selling instantly.</p>
