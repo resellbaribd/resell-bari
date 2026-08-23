@@ -22,7 +22,7 @@ export default function CreateOrderPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [customerNote, setCustomerNote] = useState('');
   
-  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [sellingPrice, setSellingPrice] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState(60);
@@ -78,11 +78,15 @@ export default function CreateOrderPage() {
   const filteredProducts = products.filter(p => {
     const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
     const matchesSubCategory = selectedSubCategory === 'all' || p.sub_category === selectedSubCategory;
-    const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase().trim());
     return matchesCategory && matchesSubCategory && matchesSearch;
   });
 
-  const selectedProduct = products.find(p => p.id === selectedProductId);
+  // Select Product Handler
+  const handleSelectProduct = (product) => {
+    setSelectedProduct(product);
+    setSellingPrice(product.suggested_price || product.price);
+  };
 
   // Profit & Calculation Formulas
   const baseWholesalePrice = Number(selectedProduct?.price || 0) * Number(quantity);
@@ -92,7 +96,7 @@ export default function CreateOrderPage() {
 
   async function handleSubmitOrder(e) {
     e.preventDefault();
-    if (!selectedProductId) return alert('অনুগ্রহ করে একটি প্রোডাক্ট সিলেক্ট করুন!');
+    if (!selectedProduct) return alert('অনুগ্রহ করে একটি প্রোডাক্ট সিলেক্ট করুন!');
     
     // 11 Digit Phone Validation
     const cleanPhone = customerPhone.trim();
@@ -109,14 +113,14 @@ export default function CreateOrderPage() {
         {
           user_id: user?.id,
           reseller_id: user?.id,
-          product_id: selectedProductId,
-          product_name: selectedProduct?.name,
+          product_id: selectedProduct.id,
+          product_name: selectedProduct.name,
           customer_name: customerName,
           customer_phone: cleanPhone,
           delivery_address: deliveryAddress,
           customer_note: customerNote || null,
           quantity: Number(quantity),
-          base_price: Number(selectedProduct?.price || 0),
+          base_price: Number(selectedProduct.price || 0),
           selling_price: Number(currentSellingPrice),
           profit_amount: Number(profit),
           delivery_charge: Number(deliveryCharge),
@@ -154,7 +158,7 @@ export default function CreateOrderPage() {
                 PLAN: {profile?.plan || 'BASIC'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">Set customer selling price to calculate your profit automatically.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Search products, choose selling price, and place reseller orders.</p>
           </div>
           <Link href="/reseller" className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-4 py-2 rounded-xl text-xs transition border border-slate-700">
             ← Back to Dashboard
@@ -164,7 +168,7 @@ export default function CreateOrderPage() {
         <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Customer Details Box */}
-          <div className="lg:col-span-7 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-4">
+          <div className="lg:col-span-6 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-4 h-fit">
             <h3 className="text-base font-bold text-emerald-400 mb-2">Customer Details</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -219,11 +223,11 @@ export default function CreateOrderPage() {
           </div>
 
           {/* Product & Pricing Box */}
-          <div className="lg:col-span-5 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-4">
-            <h3 className="text-base font-bold text-emerald-400 mb-2">Pricing & Profit</h3>
+          <div className="lg:col-span-6 bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-4">
+            <h3 className="text-base font-bold text-emerald-400 mb-2">Select Product & Pricing</h3>
 
-            {/* 🔍 Category, Sub-Category & Search Filters */}
-            <div className="space-y-2 bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80">
+            {/* 🔍 Search & Filters Bar */}
+            <div className="space-y-2 bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] text-slate-400 block mb-1 uppercase font-bold">Category</label>
@@ -255,35 +259,68 @@ export default function CreateOrderPage() {
               <div>
                 <input 
                   type="text" 
-                  placeholder="🔎 Search product by name..." 
+                  placeholder="🔎 Type product name to search..." 
                   className="w-full bg-slate-900 border border-slate-700 text-xs text-white p-2.5 rounded-xl focus:outline-none focus:border-emerald-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+
+              {/* 🌟 Live Product Search Results Grid 🌟 */}
+              <div className="max-h-48 overflow-y-auto space-y-1.5 pt-2 border-t border-slate-800/80 pr-1">
+                {filteredProducts.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-3 text-center">No products match your search/filter.</p>
+                ) : (
+                  filteredProducts.map(p => {
+                    const isSelected = selectedProduct?.id === p.id;
+                    return (
+                      <div 
+                        key={p.id}
+                        onClick={() => handleSelectProduct(p)}
+                        className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition border ${
+                          isSelected 
+                            ? 'bg-emerald-500/15 border-emerald-500/60' 
+                            : 'bg-slate-900/60 hover:bg-slate-800/80 border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <img 
+                            src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/40'} 
+                            alt={p.name} 
+                            className="w-9 h-9 rounded-lg object-cover"
+                          />
+                          <div>
+                            <h5 className="font-bold text-xs text-white">{p.name}</h5>
+                            <p className="text-[10px] text-slate-400">Base: ৳{p.price} | Sugg: ৳{p.suggested_price || p.price}</p>
+                          </div>
+                        </div>
+
+                        <button 
+                          type="button"
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition ${
+                            isSelected 
+                              ? 'bg-emerald-500 text-slate-950' 
+                              : 'bg-slate-800 text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          {isSelected ? '✓ Selected' : 'Select'}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            {/* Product Select Dropdown */}
-            <div>
-              <label className="text-xs text-slate-400 block mb-1">Select Product <span className="text-rose-500">*</span></label>
-              <select 
-                required 
-                value={selectedProductId} 
-                onChange={(e) => {
-                  setSelectedProductId(e.target.value);
-                  const prod = products.find(p => p.id === e.target.value);
-                  if (prod) setSellingPrice(prod.suggested_price || prod.price);
-                }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-emerald-400 font-bold focus:outline-none focus:border-emerald-500"
-              >
-                <option value="">-- Choose from {filteredProducts.length} Products --</option>
-                {filteredProducts.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} (Base: ৳{p.price} {p.category ? `| ${p.category}` : ''})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Selected Product Banner */}
+            {selectedProduct && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 p-3 rounded-2xl flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400">
+                  Selected: <strong className="text-white">{selectedProduct.name}</strong>
+                </span>
+                <span className="text-xs font-black text-white">Base: ৳{selectedProduct.price}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -299,7 +336,7 @@ export default function CreateOrderPage() {
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Customer Selling Price (৳)</label>
+                <label className="text-xs text-slate-400 block mb-1">Customer Selling Price (৳) *</label>
                 <input 
                   type="number" 
                   required 
@@ -351,8 +388,12 @@ export default function CreateOrderPage() {
 
             <button 
               type="submit" 
-              disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-xl text-xs transition shadow-lg shadow-emerald-500/20"
+              disabled={loading || !selectedProduct}
+              className={`w-full font-black py-3.5 rounded-xl text-xs transition shadow-lg ${
+                selectedProduct 
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20' 
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              }`}
             >
               {loading ? 'Submitting Order...' : 'Confirm & Place Order'}
             </button>
