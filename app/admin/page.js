@@ -31,7 +31,17 @@ export default function AdminDashboard() {
   const [uploading, setUploading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
 
-  const [newProduct, setNewProduct] = useState({ title: '', base_price: '', suggested_price: '', description: '', stock: 10 });
+  // 🌟 New Product State with Category & Sub-Category
+  const [newProduct, setNewProduct] = useState({ 
+    title: '', 
+    base_price: '', 
+    suggested_price: '', 
+    category: '', 
+    sub_category: '', 
+    description: '', 
+    stock: 10 
+  });
+  
   const [editingProduct, setEditingProduct] = useState(null);
   const [editMediaFiles, setEditMediaFiles] = useState([]);
   const [editUploading, setEditUploading] = useState(false);
@@ -44,11 +54,9 @@ export default function AdminDashboard() {
   const [updateOrderLoading, setUpdateOrderLoading] = useState(false);
   const [declineNoteInput, setDeclineNoteInput] = useState('');
 
-  // Selected Seller for Detailed Payout Modal View
   const [selectedSeller, setSelectedSeller] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
-  // 🔴 Ban & Terminate State
   const [banForm, setBanForm] = useState({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' });
   const [isBanning, setIsBanning] = useState(false);
 
@@ -107,7 +115,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // Copy Wallet Info
   const handleCopyWallet = (text, id) => {
     if (!text || text === 'UNSET' || text.trim() === '') return alert('No wallet details available to copy!');
     navigator.clipboard.writeText(text);
@@ -369,7 +376,7 @@ export default function AdminDashboard() {
     else alert('Error: ' + error.message);
   }
 
-  // Add Product with Multiple Images & Description
+  // 🌟 Add Product with Category and Sub-Category
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
@@ -381,6 +388,8 @@ export default function AdminDashboard() {
         name: newProduct.title,
         price: Number(newProduct.base_price) || 0,
         suggested_price: Number(newProduct.suggested_price) || 0,
+        category: newProduct.category || null,
+        sub_category: newProduct.sub_category || null,
         image_url: imageList[0],
         images: imageList,
         description: newProduct.description || null,
@@ -389,7 +398,7 @@ export default function AdminDashboard() {
 
       if (!error) {
         alert('Product successfully saved to Inventory!');
-        setNewProduct({ title: '', base_price: '', suggested_price: '', description: '', stock: 10 });
+        setNewProduct({ title: '', base_price: '', suggested_price: '', category: '', sub_category: '', description: '', stock: 10 });
         setMediaFiles([]);
         fetchAdminData();
       } else alert('Error adding product: ' + error.message);
@@ -407,6 +416,7 @@ export default function AdminDashboard() {
     else alert('Error: ' + error.message);
   }
 
+  // 🌟 Update Product with Category and Sub-Category
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -420,6 +430,8 @@ export default function AdminDashboard() {
         name: editingProduct.name || editingProduct.title,
         price: Number(editingProduct.price ?? editingProduct.base_price) || 0,
         suggested_price: Number(editingProduct.suggested_price) || 0,
+        category: editingProduct.category || null,
+        sub_category: editingProduct.sub_category || null,
         image_url: finalImages[0] || null,
         images: finalImages,
         description: editingProduct.description || null,
@@ -493,7 +505,6 @@ export default function AdminDashboard() {
     else alert('Error: ' + error.message);
   }
 
-  // 🔴 Handle Banning a Seller
   async function handleBanSeller(e) {
     e.preventDefault();
     if (!banForm.reason.trim()) return alert("Please provide a reason for the ban.");
@@ -535,7 +546,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🔴 Handle Unbanning a Seller
   async function handleUnbanSeller(sellerId) {
     if (!confirm("Are you sure you want to unban this seller?")) return;
     
@@ -561,7 +571,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🔴 Handle Deleting a Seller Profile
   async function handleDeleteSellerProfile(sellerId, sellerName) {
     if (!confirm(`⚠️ WARNING: Are you sure you want to PERMANENTLY delete seller "${sellerName}"? This action cannot be undone and will remove their profile data.`)) return;
     
@@ -685,7 +694,6 @@ export default function AdminDashboard() {
             🚪 Logout
           </button>
 
-          {/* TAB BUTTONS (Updated to Resellers) */}
           <div className="grid grid-cols-3 sm:flex bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800/80 gap-1.5 w-full sm:w-auto">
             {['overview', 'orders', 'resellers', 'inventory', 'packages'].map(tab => (
               <button
@@ -844,7 +852,6 @@ export default function AdminDashboard() {
                     <p className="text-[10px] text-slate-500">{seller.phone}</p>
                   </div>
                   
-                  {/* Status Badge */}
                   <div>
                     {seller.plan ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">
@@ -914,7 +921,6 @@ export default function AdminDashboard() {
                         <div className="text-slate-500 text-[10px]">{seller.phone}</div>
                       </td>
 
-                      {/* 🌟 MEMBERSHIP STATUS BADGE 🌟 */}
                       <td className="p-3">
                         {seller.plan ? (
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
@@ -1095,28 +1101,114 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* 📦 INVENTORY TAB */}
+      {/* 📦 INVENTORY TAB WITH CATEGORY & SUB-CATEGORY */}
       {activeTab === 'inventory' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           <div className="bg-slate-900/60 border border-slate-800 p-4 sm:p-6 rounded-3xl h-fit">
-            <h3 className="text-base sm:text-lg font-bold text-white mb-4">Add Product</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white mb-4">➕ Add New Product</h3>
             <form onSubmit={handleAddProduct} className="space-y-3">
-              <input type="text" required placeholder="Product Title *" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={newProduct.title} onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" required placeholder="Base Price *" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={newProduct.base_price} onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} />
-                <input type="number" required placeholder="Suggested Price *" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={newProduct.suggested_price} onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} />
-              </div>
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Product Images (Max 10 Files)</label>
-                <input type="file" multiple accept="image/*" onChange={(e) => handleMultipleFilesChange(e, false)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-slate-800 file:text-emerald-400" />
+                <label className="text-[11px] text-slate-400 block mb-1">Product Title *</label>
+                <input 
+                  type="text" 
+                  required 
+                  placeholder="e.g. Collagen Beauty Cream - 30g" 
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                  value={newProduct.title} 
+                  onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} 
+                />
+              </div>
+
+              {/* 🏷️ Category & Sub-Category Fields */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Category</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Skin Care" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.category} 
+                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Sub-Category</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Day Cream" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.sub_category} 
+                    onChange={(e) => setNewProduct({ ...newProduct, sub_category: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Base Price (৳) *</label>
+                  <input 
+                    type="number" 
+                    required 
+                    placeholder="300" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.base_price} 
+                    onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Suggested Price (৳) *</label>
+                  <input 
+                    type="number" 
+                    required 
+                    placeholder="500" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.suggested_price} 
+                    onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} 
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Product Images (Max 10 Files) *</label>
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*" 
+                  onChange={(e) => handleMultipleFilesChange(e, false)} 
+                  className="w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-slate-800 file:text-emerald-400" 
+                />
                 {mediaFiles.length > 0 && <p className="text-[10px] text-emerald-400 mt-1">✓ {mediaFiles.length} image(s) selected</p>}
               </div>
+
               <div>
                 <label className="text-[11px] text-slate-400 block mb-1">Product Information / Description</label>
-                <textarea rows={3} placeholder="Enter detailed specifications..." className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none" value={newProduct.description} onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} />
+                <textarea 
+                  rows={3} 
+                  placeholder="Enter detailed specifications..." 
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                  value={newProduct.description} 
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} 
+                />
               </div>
-              <input type="number" placeholder="Initial Stock Units" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} />
-              <button type="submit" disabled={uploading} className="w-full bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs transition hover:bg-emerald-400">{uploading ? 'Processing...' : '+ Save Product to Inventory'}</button>
+
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Initial Stock Units</label>
+                <input 
+                  type="number" 
+                  placeholder="10" 
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                  value={newProduct.stock} 
+                  onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} 
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={uploading} 
+                className="w-full bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs transition hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
+              >
+                {uploading ? 'Processing...' : '+ Save Product to Inventory'}
+              </button>
             </form>
           </div>
 
@@ -1125,15 +1217,22 @@ export default function AdminDashboard() {
             {products.map((p) => (
               <div key={p.id} className="p-3 sm:p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center gap-2">
                 <div className="flex items-center gap-3">
-                  <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover shrink-0" alt={p.name} />
+                  <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-xl object-cover shrink-0" alt={p.name} />
                   <div>
-                    <h4 className="font-bold text-white text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{p.name}</h4>
-                    <p className="text-[11px] text-slate-400">Base: ৳{p.price} | Stock: {p.stock || 0}</p>
+                    <h4 className="font-bold text-white text-xs sm:text-sm">{p.name}</h4>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {p.category && (
+                        <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                          {p.category} {p.sub_category ? `› ${p.sub_category}` : ''}
+                        </span>
+                      )}
+                      <p className="text-[11px] text-slate-400">Base: ৳{p.price} | Stock: {p.stock || 0}</p>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
-                  <button onClick={() => setEditingProduct(p)} className="px-2 py-1.5 sm:px-3 sm:py-2 bg-slate-800 text-amber-400 rounded-xl text-xs border border-slate-700">✏️ Edit</button>
-                  <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-2 py-1.5 sm:px-3 sm:py-2 bg-rose-500/10 text-rose-400 rounded-xl text-xs border border-rose-500/20">🗑️</button>
+                  <button onClick={() => setEditingProduct(p)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 transition">✏️ Edit</button>
+                  <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition">🗑️</button>
                 </div>
               </div>
             ))}
@@ -1540,15 +1639,15 @@ export default function AdminDashboard() {
                   <label className="text-[11px] text-slate-300 block font-semibold">Or Decline Cancellation (Enter Reason):</label>
                   <div className="flex gap-2">
                     <input 
-                      type="text"
-                      placeholder="e.g. Order already shipped/packed"
-                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white"
-                      value={declineNoteInput}
-                      onChange={(e) => setDeclineNoteInput(e.target.value)}
+                      type="text" 
+                      placeholder="e.g. Order already shipped/packed" 
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white" 
+                      value={declineNoteInput} 
+                      onChange={(e) => setDeclineNoteInput(e.target.value)} 
                     />
                     <button 
                       type="button" 
-                      onClick={() => handleDeclineCancel(managingOrder.id)}
+                      onClick={() => handleDeclineCancel(managingOrder.id)} 
                       className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl shrink-0"
                     >
                       ❌ Decline Request
@@ -1662,7 +1761,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ✏️ EDIT PRODUCT MODAL */}
+      {/* ✏️ EDIT PRODUCT MODAL WITH CATEGORY & SUB-CATEGORY */}
       {editingProduct && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl">
@@ -1672,11 +1771,62 @@ export default function AdminDashboard() {
             </div>
 
             <form onSubmit={handleUpdateProduct} className="space-y-3">
-              <input type="text" required className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={editingProduct.name || editingProduct.title || ''} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value, title: e.target.value })} />
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Product Title</label>
+                <input 
+                  type="text" 
+                  required 
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                  value={editingProduct.name || editingProduct.title || ''} 
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value, title: e.target.value })} 
+                />
+              </div>
+
+              {/* 🏷️ Edit Category & Sub-Category Fields */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Category</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Skin Care" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    value={editingProduct.category || ''} 
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Sub-Category</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Day Cream" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    value={editingProduct.sub_category || ''} 
+                    onChange={(e) => setEditingProduct({ ...editingProduct, sub_category: e.target.value })} 
+                  />
+                </div>
+              </div>
               
               <div className="grid grid-cols-2 gap-2">
-                <input type="number" required className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={editingProduct.price ?? editingProduct.base_price ?? ''} onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value, base_price: e.target.value })} />
-                <input type="number" required className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={editingProduct.suggested_price || ''} onChange={(e) => setEditingProduct({ ...editingProduct, suggested_price: e.target.value })} />
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Base Price (৳)</label>
+                  <input 
+                    type="number" 
+                    required 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    value={editingProduct.price ?? editingProduct.base_price ?? ''} 
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value, base_price: e.target.value })} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Suggested Price (৳)</label>
+                  <input 
+                    type="number" 
+                    required 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    value={editingProduct.suggested_price || ''} 
+                    onChange={(e) => setEditingProduct({ ...editingProduct, suggested_price: e.target.value })} 
+                  />
+                </div>
               </div>
 
               <div>
@@ -1689,7 +1839,10 @@ export default function AdminDashboard() {
                 <textarea rows={3} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none" value={editingProduct.description || ''} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} />
               </div>
 
-              <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} />
+              <div>
+                <label className="text-[11px] text-slate-400 block mb-1">Stock Units</label>
+                <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} />
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }} className="w-1/2 bg-slate-800 text-slate-300 font-bold py-3 rounded-xl text-xs">Cancel/Close</button>
