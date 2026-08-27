@@ -14,36 +14,39 @@ export default function HomePage() {
       <div className="absolute top-[40%] right-[-10%] w-[600px] h-[600px] bg-teal-500/10 rounded-full blur-[140px] pointer-events-none" />
 
       {/* HEADER / NAVIGATION */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 sm:px-12 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-12 h-20 flex items-center justify-between gap-2">
+          
+          {/* 🌟 Clear Big Logo Without Extra Text 🌟 */}
+          <Link href="/" className="flex items-center shrink-0">
             <img 
               src="/logo.svg" 
               alt="Resell Bari" 
-              className="h-10 w-auto object-contain rounded-xl"
+              className="h-12 sm:h-14 w-auto object-contain cursor-pointer"
             />
-            <span className="text-xl font-black tracking-wider bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              RESELL BARI
-            </span>
           </Link>
+
+          {/* Desktop Menu */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <Link href="#how-it-works" className="hover:text-emerald-600 transition">How It Works</Link>
             <Link href="#packages" className="hover:text-emerald-600 transition">Packages</Link>
             <Link href="#comparison" className="hover:text-emerald-600 transition">Comparison</Link>
             <Link href="#faq" className="hover:text-emerald-600 transition">FAQ</Link>
           </nav>
-          <div className="flex items-center gap-4">
+
+          {/* Action Buttons (Mobile Optimized) */}
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <Link 
               href="/login"
-              className="text-sm font-semibold border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl transition"
+              className="text-xs sm:text-sm font-bold border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition whitespace-nowrap"
             >
               Login
             </Link>
             <Link
               href="/register"
-              className="text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl transition shadow-md shadow-emerald-500/20"
+              className="text-xs sm:text-sm font-bold bg-emerald-500 hover:bg-emerald-600 text-white px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl transition shadow-md shadow-emerald-500/20 whitespace-nowrap"
             >
-              Became a Reseller
+              Become a Reseller
             </Link>
           </div>
         </div>
@@ -188,7 +191,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* COMPARISON & CTA */}
+        {/* PACKAGES */}
         <section id="packages" className="space-y-12 scroll-mt-28">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900">আপনার জন্য উপযুক্ত Membership Plan বেছে নিন</h2>
@@ -297,13 +300,12 @@ export default function HomePage() {
       <footer className="border-t border-slate-200/80 bg-white mt-32">
         <div className="max-w-7xl mx-auto px-6 sm:px-12 py-12 grid grid-cols-1 md:grid-cols-4 gap-10 text-sm text-slate-600">
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center">
               <img 
                 src="/logo.svg" 
                 alt="Resell Bari" 
-                className="h-8 w-auto object-contain rounded-lg"
+                className="h-10 w-auto object-contain"
               />
-              <span className="text-base font-black text-slate-900 tracking-wider">RESELL BARI</span>
             </div>
             <p className="leading-relaxed text-xs sm:text-sm text-slate-500">
               বাংলাদেশের আধুনিক অনলাইন রিসেলিং প্ল্যাটফর্ম। Wholesale মূল্যে পণ্য সংগ্রহ করে আপনার নিজস্ব অনলাইন ব্যবসা পরিচালনা করুন।
