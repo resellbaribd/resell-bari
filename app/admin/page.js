@@ -743,19 +743,65 @@ export default function AdminDashboard() {
   if (loading) return <div className="min-h-screen bg-[#0b0f19] text-slate-300 p-8 flex items-center justify-center font-sans">Loading Enterprise Control Hub...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 p-3 sm:p-8 font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row overflow-x-hidden">
       
-      <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-4 sm:p-6 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-2xl">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-            ⚡ Enterprise Admin Control Hub
-          </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Order lifecycles, analytics, low stock alerts, packages, payments, and reseller management.</p>
+      {/* 🧭 LEFT SIDEBAR NAVIGATION */}
+      <aside className="w-full md:w-64 bg-slate-900/90 border-r border-slate-800 p-5 flex flex-col justify-between shrink-0 md:min-h-screen sticky top-0 z-40 backdrop-blur-xl">
+        <div className="space-y-6">
+          
+          {/* LOGO & BRANDING */}
+          <div className="flex items-center gap-3 px-2">
+            <span className="text-2xl p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">⚡</span>
+            <div>
+              <h1 className="text-sm font-black text-white tracking-wide uppercase">Resell Bari</h1>
+              <p className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Enterprise Admin</p>
+            </div>
+          </div>
+
+          {/* MENU ITEMS */}
+          <nav className="space-y-1.5">
+            {[
+              { id: 'overview', label: 'Overview', icon: '📊' },
+              { id: 'orders', label: 'Orders', icon: '📦', badge: pendingOrders.length },
+              { id: 'resellers', label: 'Resellers', icon: '👥' },
+              { id: 'payments', label: 'Payments', icon: '💳', badge: pendingPayments.length },
+              { id: 'inventory', label: 'Inventory', icon: '🏷️' },
+              { id: 'packages', label: 'Packages', icon: '💎' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition ${
+                  activeTab === tab.id
+                    ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">{tab.icon}</span>
+                  <span>{tab.label}</span>
+                </div>
+                {tab.badge > 0 && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                    activeTab === tab.id 
+                      ? 'bg-slate-950 text-emerald-400' 
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
-          <Link className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md" href="/products?mode=admin">
-            👁️ View Shop Page
+        {/* SIDEBAR FOOTER ACTIONS */}
+        <div className="pt-6 border-t border-slate-800/80 space-y-2">
+          <Link 
+            href="/products?mode=admin" 
+            className="w-full flex items-center gap-2 px-3.5 py-2.5 bg-slate-800/60 hover:bg-slate-800 text-amber-400 border border-slate-700/60 rounded-xl text-xs font-bold transition"
+          >
+            <span>👁️</span> View Shop Page
           </Link>
 
           <button 
@@ -763,846 +809,844 @@ export default function AdminDashboard() {
               await supabase.auth.signOut();
               window.location.href = '/login';
             }}
-            className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md"
+            className="w-full flex items-center gap-2 px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-bold transition"
           >
-            🚪 Logout
+            <span>🚪</span> Logout
           </button>
+        </div>
+      </aside>
 
-          <div className="grid grid-cols-3 sm:flex bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800/80 gap-1.5 w-full sm:w-auto">
-            {['overview', 'orders', 'resellers', 'payments', 'inventory', 'packages'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-2 rounded-xl text-[11px] sm:text-xs font-bold capitalize transition text-center flex items-center justify-center gap-1 ${
-                  activeTab === tab ? 'bg-emerald-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-900/50 sm:bg-transparent'
-                }`}
-              >
-                <span>
-                  {tab === 'resellers' ? '👥 Resellers' : 
-                   tab === 'payments' ? `💳 Payments${pendingPayments.length > 0 ? ` (${pendingPayments.length})` : ''}` : 
-                   tab === 'packages' ? '📦 Packages' : tab}
-                </span>
-              </button>
-            ))}
+      {/* 🖥️ MAIN CONTENT AREA */}
+      <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full">
+        
+        {/* HEADER BAR */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-white capitalize">{activeTab} Control Center</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Manage lifecycles, analytics, packages, payments, and resellers.</p>
+          </div>
+          <div className="text-xs font-mono bg-slate-950 border border-slate-800 px-3.5 py-1.5 rounded-xl text-slate-400">
+            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </div>
         </div>
-      </div>
 
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* 💳 PENDING PAYMENTS ALERT */}
-          {pendingPayments.length > 0 && (
-            <div className="bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-teal-500/5 border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-pulse">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <span className="text-2xl sm:text-4xl bg-emerald-500/20 p-2.5 sm:p-3 rounded-2xl border border-emerald-500/40">💳</span>
-                <div>
-                  <h3 className="text-base sm:text-xl font-extrabold text-emerald-400 tracking-wide">
-                    {pendingPayments.length} RESELLER MEMBERSHIP PAYMENT{pendingPayments.length > 1 ? 'S' : ''} PENDING!
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">Resellers submitted payment details. Verify TrxID and activate accounts.</p>
-                </div>
-              </div>
-              <button onClick={() => setActiveTab('payments')} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition shadow-lg shrink-0 text-center">
-                ⚡ Verify Payments ({pendingPayments.length})
-              </button>
-            </div>
-          )}
-
-          {cancelRequests.length > 0 && (
-            <div className="bg-gradient-to-r from-rose-500/20 via-rose-500/10 to-rose-500/5 border-2 border-rose-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl sm:text-3xl bg-rose-500/20 p-2.5 rounded-2xl border border-rose-500/40">🚨</span>
-                <div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-rose-400">
-                    {cancelRequests.length} ORDER CANCELLATION REQUEST{cancelRequests.length > 1 ? 'S' : ''} PENDING!
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300">Resellers have requested to cancel the following orders. Review reasons and approve or decline.</p>
-                </div>
-              </div>
-              <div className="space-y-2 pt-2">
-                {cancelRequests.map(o => (
-                  <div key={o.id} className="bg-slate-950/80 border border-rose-900/40 p-3.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
-                    <div>
-                      <p className="font-bold text-white">Customer: {o.customer_name} ({o.customer_phone}) - <span className="text-emerald-400">৳{o.total_amount}</span></p>
-                      <p className="text-amber-400 mt-0.5">💬 Reseller Reason: "{o.cancel_reason || 'No reason provided'}"</p>
-                    </div>
-                    <button 
-                      onClick={() => { setActiveTab('orders'); setManagingOrder(o); }}
-                      className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl transition shrink-0"
-                    >
-                      Review & Decide
-                    </button>
+        {/* TAB 1: OVERVIEW */}
+        {activeTab === 'overview' && (
+          <div className="space-y-6">
+            {/* 💳 PENDING PAYMENTS ALERT */}
+            {pendingPayments.length > 0 && (
+              <div className="bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-teal-500/5 border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-pulse">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <span className="text-2xl sm:text-4xl bg-emerald-500/20 p-2.5 sm:p-3 rounded-2xl border border-emerald-500/40">💳</span>
+                  <div>
+                    <h3 className="text-base sm:text-xl font-extrabold text-emerald-400 tracking-wide">
+                      {pendingPayments.length} RESELLER MEMBERSHIP PAYMENT{pendingPayments.length > 1 ? 'S' : ''} PENDING!
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">Resellers submitted payment details. Verify TrxID and activate accounts.</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {pendingOrders.length > 0 ? (
-            <div className="bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-amber-500/5 border-2 border-amber-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-pulse">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <span className="text-2xl sm:text-4xl bg-amber-500/20 p-2.5 sm:p-3 rounded-2xl border border-amber-500/40">🔔</span>
-                <div>
-                  <h3 className="text-base sm:text-xl font-extrabold text-amber-400 tracking-wide">
-                    {pendingOrders.length} NEW RESELLER ORDER{pendingOrders.length > 1 ? 'S' : ''} AWAITING PROCESSING!
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">Resellers have submitted new orders. Please review or process them now.</p>
                 </div>
-              </div>
-              <button onClick={() => setActiveTab('orders')} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition shadow-lg shrink-0 text-center">
-                ⚡ Review & Process ({pendingOrders.length})
-              </button>
-            </div>
-          ) : (
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 text-xs text-slate-400 flex items-center gap-2">
-              <span>✅</span> No pending new reseller orders right now.
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
-              <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Total Orders</p>
-              <h2 className="text-xl sm:text-3xl font-extrabold text-white mt-1 sm:mt-2">{orders.length}</h2>
-            </div>
-            <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
-              <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Delivered Sales</p>
-              <h2 className="text-xl sm:text-3xl font-extrabold text-emerald-400 mt-1 sm:mt-2">৳{deliveredSalesValue}</h2>
-            </div>
-            <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
-              <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Reseller Profit</p>
-              <h2 className="text-xl sm:text-3xl font-extrabold text-teal-400 mt-1 sm:mt-2">৳{totalResellerProfit}</h2>
-            </div>
-            <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
-              <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Low Stock</p>
-              <h2 className={`text-xl sm:text-3xl font-extrabold mt-1 sm:mt-2 ${lowStockProducts.length > 0 ? 'text-rose-500' : 'text-slate-400'}`}>{lowStockProducts.length} Items</h2>
-            </div>
-          </div>
-
-          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white">Sales & Revenue Analytics Graph</h3>
-                <p className="text-[11px] sm:text-xs text-slate-400">Visual trend chart of performance over time.</p>
-              </div>
-
-              <div className="flex bg-slate-800 rounded-xl p-1 text-xs self-end sm:self-auto">
-                {['daily', 'monthly', 'yearly'].map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setChartFilter(f)}
-                    className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg font-semibold capitalize transition text-[11px] ${
-                      chartFilter === f ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="h-56 sm:h-72 w-full pt-2">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
-                      formatter={(value) => [`৳${value}`, 'Sales']}
-                    />
-                    <Area type="monotone" dataKey="Sales" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">No sales data available</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 💳 PAYMENT REQUESTS TAB */}
-      {activeTab === 'payments' && (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">💳 Membership Payment & Activation Requests</h2>
-              <p className="text-[11px] sm:text-xs text-slate-400">Verify user transaction IDs, confirm payments, or decline requests.</p>
-            </div>
-
-            <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 gap-1">
-              {['all', 'pending', 'approved', 'declined'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setPaymentFilter(tab)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition ${
-                    paymentFilter === tab
-                      ? 'bg-emerald-500 text-slate-950 font-bold'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {tab}
+                <button onClick={() => setActiveTab('payments')} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition shadow-lg shrink-0 text-center">
+                  ⚡ Verify Payments ({pendingPayments.length})
                 </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
-                  <th className="p-3">User / Email</th>
-                  <th className="p-3">Plan</th>
-                  <th className="p-3">Method</th>
-                  <th className="p-3">Sender Phone</th>
-                  <th className="p-3">TrxID</th>
-                  <th className="p-3">Amount</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
-                {filteredActivationRequests.length === 0 ? (
-                  <tr><td colSpan={8} className="p-6 text-center text-slate-500">No payment requests found.</td></tr>
-                ) : (
-                  filteredActivationRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-slate-800/20">
-                      <td className="p-3">
-                        <div className="font-bold text-white">{req.email || 'N/A'}</div>
-                        <div className="text-[10px] text-slate-500">{new Date(req.created_at).toLocaleString()}</div>
-                      </td>
-                      <td className="p-3">
-                        <span className="px-2.5 py-1 bg-slate-800 text-emerald-400 rounded-lg text-[10px] font-bold uppercase">
-                          {req.plan}
-                        </span>
-                      </td>
-                      <td className="p-3 font-bold text-amber-400">{req.payment_method}</td>
-                      <td className="p-3 font-mono font-semibold">{req.phone_number}</td>
-                      <td className="p-3 font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2 rounded">
-                        {req.transaction_id}
-                      </td>
-                      <td className="p-3 font-bold text-white">{req.amount}</td>
-                      <td className="p-3">
-                        {req.status === 'pending' && (
-                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-[10px] font-bold">
-                            ● Pending
-                          </span>
-                        )}
-                        {req.status === 'approved' && (
-                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-bold">
-                            ✓ Approved
-                          </span>
-                        )}
-                        {req.status === 'declined' && (
-                          <span className="px-2.5 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-[10px] font-bold">
-                            ✕ Declined
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right">
-                        {req.status === 'pending' ? (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleApprovePayment(req)}
-                              disabled={paymentActionLoading === req.id}
-                              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => handleDeclinePayment(req)}
-                              disabled={paymentActionLoading === req.id}
-                              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
-                            >
-                              Decline
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-500 text-xs italic">Completed</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 👥 RESELLERS HUB TAB */}
-      {activeTab === 'resellers' && (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
-          <h2 className="text-base sm:text-lg font-bold text-white mb-1">👥 Reseller Management & Seller Hub</h2>
-          <p className="text-[11px] sm:text-xs text-slate-400 mb-4 sm:mb-6">View registered sellers, membership status, sales breakdown, and manage accounts.</p>
-
-          <div className="block md:hidden space-y-3">
-            {sellersList.map((seller, idx) => (
-              <div key={seller.id} className={`p-3.5 bg-slate-950/80 border ${seller.is_banned ? 'border-rose-500/50' : 'border-slate-800'} rounded-2xl space-y-2.5`}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[10px] font-mono bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-bold">Serial #{idx + 1}</span>
-                    <h4 className="font-bold text-white text-sm mt-1 flex items-center gap-1.5">
-                      {seller.name}
-                      {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black">BANNED</span>}
-                    </h4>
-                    <p className="text-[11px] text-slate-300">{seller.email}</p>
-                    <p className="text-[10px] text-slate-500">{seller.phone}</p>
-                  </div>
-                  
-                  <div>
-                    {seller.plan ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        {seller.plan}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/30">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                        NO PLAN
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-1.5 bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-                  <span className="uppercase text-[10px] font-bold text-emerald-400">
-                    {seller.payment_method}
-                  </span>
-                  <button 
-                    onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
-                    className="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1 rounded-lg text-emerald-400 font-bold"
-                  >
-                    {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
-                  </button>
-                </div>
-
-                <div className="flex justify-between items-center pt-1 text-xs">
-                  <span className="text-slate-400">Total Orders: <strong className="text-white">{seller.orders.length}</strong></span>
-                  <button 
-                    onClick={() => setSelectedSeller(seller)}
-                    className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs shadow"
-                  >
-                    📊 View Dashboard
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
-                  <th className="p-3 w-16">Serial</th>
-                  <th className="p-3">Seller Name & Details</th>
-                  <th className="p-3">Membership Status</th>
-                  <th className="p-3">Wallet / Bank Details</th>
-                  <th className="p-3">Total Orders</th>
-                  <th className="p-3 text-right">Dashboard Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
-                {sellersList.length === 0 ? (
-                  <tr><td colSpan={6} className="p-6 text-center text-slate-500">No sellers found.</td></tr>
-                ) : (
-                  sellersList.map((seller, idx) => (
-                    <tr key={seller.id} className={`hover:bg-slate-800/20 ${seller.is_banned ? 'bg-rose-950/10' : ''}`}>
-                      <td className="p-3 font-mono font-bold text-emerald-400">#{idx + 1}</td>
-                      
-                      <td className="p-3">
-                        <div className="font-bold text-white text-sm flex items-center gap-2">
-                          {seller.name}
-                          {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black">BANNED</span>}
-                        </div>
-                        <div className="text-slate-300 text-[11px]">{seller.email}</div>
-                        <div className="text-slate-500 text-[10px]">{seller.phone}</div>
-                      </td>
-
-                      <td className="p-3">
-                        {seller.plan ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                            ACTIVE ({seller.plan})
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/30 tracking-wide">
-                            <span className="w-2 h-2 rounded-full bg-rose-500"></span>
-                            NO PLAN (ONLY REGISTERED)
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="uppercase font-bold text-emerald-400">{seller.payment_method}</span>
-                          <button 
-                            onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
-                            className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] px-2 py-1 rounded-lg text-emerald-400 font-bold transition"
-                          >
-                            {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
-                          </button>
-                        </div>
-                      </td>
-
-                      <td className="p-3 font-semibold text-slate-200">{seller.orders.length} Orders</td>
-
-                      <td className="p-3 text-right">
-                        <button 
-                          onClick={() => setSelectedSeller(seller)}
-                          className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl transition text-xs shadow-md"
-                        >
-                          📊 View Seller Dashboard & Breakdown
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 📦 ORDERS TAB */}
-      {activeTab === 'orders' && (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-white">Live Reseller Orders Stream</h2>
-              <p className="text-[11px] sm:text-xs text-slate-400">Manage orders, seller details, and print custom invoices.</p>
-            </div>
-
-            {selectedOrderIds.length > 0 && (
-              <div className="flex flex-wrap gap-2 items-center bg-slate-950/90 border border-emerald-500/40 p-2.5 rounded-2xl w-full sm:w-auto justify-between">
-                <span className="text-xs font-bold text-emerald-400">{selectedOrderIds.length} Selected</span>
-                <div className="flex gap-2 items-center flex-wrap">
-                  <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="bg-slate-800 text-xs text-white p-1.5 rounded-xl border border-slate-700">
-                    <option value="confirmed">Confirmed</option>
-                    <option value="in_transit">In Transit</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                  <button onClick={handleBulkStatusChange} disabled={bulkUpdating} className="bg-emerald-500 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-xl shrink-0 hover:bg-emerald-400 transition">
-                    {bulkUpdating ? '...' : 'Apply Status'}
-                  </button>
-                  <button onClick={handleBulkDeleteOrders} disabled={bulkUpdating} className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl shrink-0 transition">
-                    🗑️ Delete Selected
-                  </button>
-                </div>
               </div>
             )}
-          </div>
 
-          <div className="block md:hidden space-y-3">
-            {orders.map(o => (
-              <div key={o.id} className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => handleSelectOrder(o.id)} className="w-4 h-4 accent-emerald-500" />
-                    <div>
-                      <h4 className="font-bold text-white text-sm flex items-center gap-1.5">
-                        Customer: {o.customer_name}
-                        {o.status === 'cancel_requested' && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black animate-pulse">CANCEL REQ</span>}
-                      </h4>
-                      <p className="text-slate-400 text-[11px]">{o.customer_phone}</p>
-                      {o.cancel_reason && <p className="text-[11px] text-amber-400 mt-1">Reason: "{o.cancel_reason}"</p>}
-                    </div>
-                  </div>
-                  <strong className="text-emerald-400 text-xs">৳{o.total_amount}</strong>
-                </div>
-
-                <div className="flex justify-between items-center pt-2 border-t border-slate-800/80 text-xs gap-2">
-                  <div className="flex gap-1.5">
-                    <button onClick={() => setManagingOrder(o)} className="px-2.5 py-1.5 bg-slate-800 text-emerald-400 rounded-xl font-bold text-[11px]">⚙️ Manage</button>
-                    <button onClick={() => handleDeleteOrder(o.id, o.customer_name)} className="px-2.5 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl font-bold text-[11px]">🗑️ Delete</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
-                  <th className="p-3 w-[5%] text-center"><input type="checkbox" checked={orders.length > 0 && selectedOrderIds.length === orders.length} onChange={handleSelectAllOrders} className="w-4 h-4 accent-emerald-500" /></th>
-                  <th className="p-3 w-[25%]">Customer Info</th>
-                  <th className="p-3 w-[22%]">Seller / Shop Name</th>
-                  <th className="p-3 w-[18%]">Selling / Profit</th>
-                  <th className="p-3 w-[12%]">Status</th>
-                  <th className="p-3 w-[18%] text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-slate-800/20">
-                    <td className="p-3 text-center"><input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => handleSelectOrder(o.id)} className="w-4 h-4 accent-emerald-500" /></td>
-                    <td className="p-3">
-                      <div className="font-bold text-white flex items-center gap-1.5">
-                        {o.customer_name}
-                        {o.status === 'cancel_requested' && (
-                          <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black animate-pulse">
-                            CANCEL REQUESTED
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-slate-400 text-[11px]">{o.customer_phone}</div>
-                      {o.cancel_reason && (
-                        <div className="text-[11px] text-amber-400 mt-1 italic">
-                          💬 Cancel Reason: "{o.cancel_reason}"
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div className="font-bold text-amber-400">{o.seller_name}</div>
-                      <div className="text-slate-500 text-[10px]">{o.seller_phone}</div>
-                    </td>
-                    <td className="p-3">
-                      <div>Selling: <strong>৳{o.total_amount}</strong></div>
-                      <div className="text-emerald-400 font-semibold">Profit: ৳{o.profit_amount || 0}</div>
-                    </td>
-                    <td className="p-3">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${
-                        o.status === 'cancel_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                        o.status === 'cancelled' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
-                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      }`}>
-                        {o.status === 'cancel_requested' ? 'Cancel Req' : o.status?.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button 
-                          onClick={() => setManagingOrder(o)}
-                          className={`px-2.5 py-1.5 rounded-xl font-bold transition text-[11px] whitespace-nowrap ${
-                            o.status === 'cancel_requested' 
-                              ? 'bg-rose-500 text-white animate-pulse' 
-                              : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700'
-                          }`}
-                        >
-                          {o.status === 'cancel_requested' ? '🚨 Review Cancel' : '⚙️ Manage'}
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteOrder(o.id, o.customer_name)}
-                          className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl font-bold transition text-[11px] flex items-center gap-1 whitespace-nowrap"
-                        >
-                          🗑️ Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 📦 INVENTORY TAB WITH CATEGORY & SUB-CATEGORY */}
-      {activeTab === 'inventory' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-          <div className="bg-slate-900/60 border border-slate-800 p-4 sm:p-6 rounded-3xl h-fit">
-            <h3 className="text-base sm:text-lg font-bold text-white mb-4">➕ Add New Product</h3>
-            <form onSubmit={handleAddProduct} className="space-y-3">
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Product Title *</label>
-                <input 
-                  type="text" 
-                  required 
-                  placeholder="e.g. Collagen Beauty Cream - 30g" 
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                  value={newProduct.title} 
-                  onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} 
-                />
-              </div>
-
-              {/* 🏷️ Category & Sub-Category Fields */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Category</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Skin Care" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                    value={newProduct.category} 
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} 
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Sub-Category</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g. Day Cream" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                    value={newProduct.sub_category} 
-                    onChange={(e) => setNewProduct({ ...newProduct, sub_category: e.target.value })} 
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Base Price (৳) *</label>
-                  <input 
-                    type="number" 
-                    required 
-                    placeholder="300" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                    value={newProduct.base_price} 
-                    onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} 
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Suggested Price (৳) *</label>
-                  <input 
-                    type="number" 
-                    required 
-                    placeholder="500" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                    value={newProduct.suggested_price} 
-                    onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Product Images (Max 10 Files) *</label>
-                <input 
-                  type="file" 
-                  multiple 
-                  accept="image/*" 
-                  onChange={(e) => handleMultipleFilesChange(e, false)} 
-                  className="w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-slate-800 file:text-emerald-400" 
-                />
-                {mediaFiles.length > 0 && <p className="text-[10px] text-emerald-400 mt-1">✓ {mediaFiles.length} image(s) selected</p>}
-              </div>
-
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Product Information / Description</label>
-                <textarea 
-                  rows={3} 
-                  placeholder="Enter detailed specifications..." 
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                  value={newProduct.description} 
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} 
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Initial Stock Units</label>
-                <input 
-                  type="number" 
-                  placeholder="10" 
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
-                  value={newProduct.stock} 
-                  onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} 
-                />
-              </div>
-
-              <button 
-                type="submit" 
-                disabled={uploading} 
-                className="w-full bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs transition hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
-              >
-                {uploading ? 'Processing...' : '+ Save Product to Inventory'}
-              </button>
-            </form>
-          </div>
-
-          <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6 space-y-3">
-            <h3 className="text-base sm:text-lg font-bold text-white mb-2">Inventory Catalogue ({products.length})</h3>
-            {products.map((p) => (
-              <div key={p.id} className="p-3 sm:p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center gap-2">
+            {cancelRequests.length > 0 && (
+              <div className="bg-gradient-to-r from-rose-500/20 via-rose-500/10 to-rose-500/5 border-2 border-rose-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-3">
                 <div className="flex items-center gap-3">
-                  <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-xl object-cover shrink-0" alt={p.name} />
+                  <span className="text-2xl sm:text-3xl bg-rose-500/20 p-2.5 rounded-2xl border border-rose-500/40">🚨</span>
                   <div>
-                    <h4 className="font-bold text-white text-xs sm:text-sm">{p.name}</h4>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {p.category && (
-                        <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                          {p.category} {p.sub_category ? `› ${p.sub_category}` : ''}
-                        </span>
-                      )}
-                      <p className="text-[11px] text-slate-400">Base: ৳{p.price} | Stock: {p.stock || 0}</p>
-                    </div>
+                    <h3 className="text-base sm:text-lg font-extrabold text-rose-400">
+                      {cancelRequests.length} ORDER CANCELLATION REQUEST{cancelRequests.length > 1 ? 'S' : ''} PENDING!
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300">Resellers have requested to cancel the following orders. Review reasons and approve or decline.</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <button onClick={() => setEditingProduct(p)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 transition">✏️ Edit</button>
-                  <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition">🗑️</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 📦 PACKAGES TAB */}
-      {activeTab === 'packages' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-          <div className="bg-slate-900/60 border border-slate-800 p-4 sm:p-6 rounded-3xl h-fit space-y-4">
-            <h3 className="text-base sm:text-lg font-bold text-white">
-              {editingPkg ? '✏️ Edit Membership Package' : '➕ Create New Package'}
-            </h3>
-
-            <form onSubmit={handleSavePackage} className="space-y-3.5">
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Package Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Basic, Advance, Premium"
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none"
-                  value={pkgForm.name}
-                  onChange={(e) => setPkgForm({ ...pkgForm, name: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Price (৳) *</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="349"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none"
-                    value={pkgForm.price}
-                    onChange={(e) => setPkgForm({ ...pkgForm, price: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Discount (% Off)</label>
-                  <input
-                    type="number"
-                    placeholder="2 or 4"
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none"
-                    value={pkgForm.discount_percent}
-                    onChange={(e) => setPkgForm({ ...pkgForm, discount_percent: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] text-slate-400 block">Rules & Benefits (Bullet Points)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. 2% Flat Discount on all products"
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none"
-                    value={pkgForm.featureInput}
-                    onChange={(e) => setPkgForm({ ...pkgForm, featureInput: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddFeatureToPkg}
-                    className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-bold text-xs px-3 py-2 rounded-xl shrink-0"
-                  >
-                    + Add
-                  </button>
-                </div>
-
-                <div className="space-y-1 pt-1">
-                  {pkgForm.features.map((feat, idx) => (
-                    <div key={idx} className="flex justify-between items-center bg-slate-950/80 p-2 rounded-lg text-xs text-slate-300 border border-slate-800">
-                      <span className="truncate max-w-[200px]">• {feat}</span>
-                      <button type="button" onClick={() => handleRemoveFeature(idx)} className="text-rose-400 hover:text-rose-300 font-bold ml-2">✕</button>
+                <div className="space-y-2 pt-2">
+                  {cancelRequests.map(o => (
+                    <div key={o.id} className="bg-slate-950/80 border border-rose-900/40 p-3.5 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                      <div>
+                        <p className="font-bold text-white">Customer: {o.customer_name} ({o.customer_phone}) - <span className="text-emerald-400">৳{o.total_amount}</span></p>
+                        <p className="text-amber-400 mt-0.5">💬 Reseller Reason: "{o.cancel_reason || 'No reason provided'}"</p>
+                      </div>
+                      <button 
+                        onClick={() => { setActiveTab('orders'); setManagingOrder(o); }}
+                        className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded-xl transition shrink-0"
+                      >
+                        Review & Decide
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
 
-              <div className="flex gap-2 pt-2">
-                {editingPkg && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingPkg(null);
-                      setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
-                    }}
-                    className="w-1/2 bg-slate-800 text-slate-300 font-bold py-3 rounded-xl text-xs"
-                  >
-                    Cancel
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={savingPkg}
-                  className={`w-full ${editingPkg ? 'w-1/2 bg-amber-500 text-slate-950' : 'bg-emerald-500 text-slate-950'} font-bold py-3 rounded-xl text-xs transition hover:opacity-90`}
-                >
-                  {savingPkg ? 'Saving...' : editingPkg ? 'Update Package' : '+ Save Package'}
+            {pendingOrders.length > 0 ? (
+              <div className="bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-amber-500/5 border-2 border-amber-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-pulse">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <span className="text-2xl sm:text-4xl bg-amber-500/20 p-2.5 sm:p-3 rounded-2xl border border-amber-500/40">🔔</span>
+                  <div>
+                    <h3 className="text-base sm:text-xl font-extrabold text-amber-400 tracking-wide">
+                      {pendingOrders.length} NEW RESELLER ORDER{pendingOrders.length > 1 ? 'S' : ''} AWAITING PROCESSING!
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">Resellers have submitted new orders. Please review or process them now.</p>
+                  </div>
+                </div>
+                <button onClick={() => setActiveTab('orders')} className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition shadow-lg shrink-0 text-center">
+                  ⚡ Review & Process ({pendingOrders.length})
                 </button>
               </div>
-            </form>
+            ) : (
+              <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 text-xs text-slate-400 flex items-center gap-2">
+                <span>✅</span> No pending new reseller orders right now.
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Total Orders</p>
+                <h2 className="text-xl sm:text-3xl font-extrabold text-white mt-1 sm:mt-2">{orders.length}</h2>
+              </div>
+              <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Delivered Sales</p>
+                <h2 className="text-xl sm:text-3xl font-extrabold text-emerald-400 mt-1 sm:mt-2">৳{deliveredSalesValue}</h2>
+              </div>
+              <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Reseller Profit</p>
+                <h2 className="text-xl sm:text-3xl font-extrabold text-teal-400 mt-1 sm:mt-2">৳{totalResellerProfit}</h2>
+              </div>
+              <div className="p-4 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
+                <p className="text-[10px] sm:text-xs text-slate-400 uppercase font-medium">Low Stock</p>
+                <h2 className={`text-xl sm:text-3xl font-extrabold mt-1 sm:mt-2 ${lowStockProducts.length > 0 ? 'text-rose-500' : 'text-slate-400'}`}>{lowStockProducts.length} Items</h2>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white">Sales & Revenue Analytics Graph</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400">Visual trend chart of performance over time.</p>
+                </div>
+
+                <div className="flex bg-slate-800 rounded-xl p-1 text-xs self-end sm:self-auto">
+                  {['daily', 'monthly', 'yearly'].map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setChartFilter(f)}
+                      className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg font-semibold capitalize transition text-[11px] ${
+                        chartFilter === f ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="h-56 sm:h-72 w-full pt-2">
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                      <XAxis dataKey="name" stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
+                        formatter={(value) => [`৳${value}`, 'Sales']}
+                      />
+                      <Area type="monotone" dataKey="Sales" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">No sales data available</div>
+                )}
+              </div>
+            </div>
           </div>
+        )}
 
-          <div className="lg:col-span-2 space-y-3 sm:space-y-4">
-            <h3 className="text-base sm:text-lg font-bold text-white mb-2">Active Packages Catalogue ({packages.length})</h3>
+        {/* TAB 2: PAYMENTS */}
+        {activeTab === 'payments' && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white">💳 Membership Payment & Activation Requests</h2>
+                <p className="text-[11px] sm:text-xs text-slate-400">Verify user transaction IDs, confirm payments, or decline requests.</p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              {packages.map((pkg) => (
-                <div key={pkg.id} className="bg-slate-900/60 border border-slate-800 p-4 sm:p-5 rounded-3xl flex flex-col justify-between space-y-4 shadow-xl">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-base font-bold text-white uppercase">{pkg.name}</h4>
-                        <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-0.5">৳{pkg.price}</p>
-                      </div>
-                      <span className="text-[10px] uppercase font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full shrink-0">
-                        {pkg.discount_percent}% Off
-                      </span>
+              <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 gap-1">
+                {['all', 'pending', 'approved', 'declined'].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setPaymentFilter(tab)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition ${
+                      paymentFilter === tab
+                        ? 'bg-emerald-500 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                    <th className="p-3">User / Email</th>
+                    <th className="p-3">Plan</th>
+                    <th className="p-3">Method</th>
+                    <th className="p-3">Sender Phone</th>
+                    <th className="p-3">TrxID</th>
+                    <th className="p-3">Amount</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
+                  {filteredActivationRequests.length === 0 ? (
+                    <tr><td colSpan={8} className="p-6 text-center text-slate-500">No payment requests found.</td></tr>
+                  ) : (
+                    filteredActivationRequests.map((req) => (
+                      <tr key={req.id} className="hover:bg-slate-800/20">
+                        <td className="p-3">
+                          <div className="font-bold text-white">{req.email || 'N/A'}</div>
+                          <div className="text-[10px] text-slate-500">{new Date(req.created_at).toLocaleString()}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2.5 py-1 bg-slate-800 text-emerald-400 rounded-lg text-[10px] font-bold uppercase">
+                            {req.plan}
+                          </span>
+                        </td>
+                        <td className="p-3 font-bold text-amber-400">{req.payment_method}</td>
+                        <td className="p-3 font-mono font-semibold">{req.phone_number}</td>
+                        <td className="p-3 font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2 rounded">
+                          {req.transaction_id}
+                        </td>
+                        <td className="p-3 font-bold text-white">{req.amount}</td>
+                        <td className="p-3">
+                          {req.status === 'pending' && (
+                            <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-[10px] font-bold">
+                              ● Pending
+                            </span>
+                          )}
+                          {req.status === 'approved' && (
+                            <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-bold">
+                              ✓ Approved
+                            </span>
+                          )}
+                          {req.status === 'declined' && (
+                            <span className="px-2.5 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-[10px] font-bold">
+                              ✕ Declined
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right">
+                          {req.status === 'pending' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => handleApprovePayment(req)}
+                                disabled={paymentActionLoading === req.id}
+                                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => handleDeclinePayment(req)}
+                                disabled={paymentActionLoading === req.id}
+                                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500 text-xs italic">Completed</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: RESELLERS */}
+        {activeTab === 'resellers' && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
+            <h2 className="text-base sm:text-lg font-bold text-white mb-1">👥 Reseller Management & Seller Hub</h2>
+            <p className="text-[11px] sm:text-xs text-slate-400 mb-4 sm:mb-6">View registered sellers, membership status, sales breakdown, and manage accounts.</p>
+
+            <div className="block md:hidden space-y-3">
+              {sellersList.map((seller, idx) => (
+                <div key={seller.id} className={`p-3.5 bg-slate-950/80 border ${seller.is_banned ? 'border-rose-500/50' : 'border-slate-800'} rounded-2xl space-y-2.5`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-mono bg-slate-800 px-2 py-0.5 rounded text-emerald-400 font-bold">Serial #{idx + 1}</span>
+                      <h4 className="font-bold text-white text-sm mt-1 flex items-center gap-1.5">
+                        {seller.name}
+                        {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black">BANNED</span>}
+                      </h4>
+                      <p className="text-[11px] text-slate-300">{seller.email}</p>
+                      <p className="text-[10px] text-slate-500">{seller.phone}</p>
                     </div>
-
-                    <div className="mt-3 space-y-1 border-t border-slate-800/80 pt-2.5">
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Rules & Perks:</p>
-                      {pkg.features && pkg.features.length > 0 ? (
-                        pkg.features.map((f, idx) => (
-                          <p key={idx} className="text-xs text-slate-300 flex items-center gap-1.5">
-                            <span className="text-emerald-400 font-bold">✓</span> {f}
-                          </p>
-                        ))
+                    
+                    <div>
+                      {seller.plan ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                          {seller.plan}
+                        </span>
                       ) : (
-                        <p className="text-xs text-slate-500 italic">No custom rules added.</p>
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                          NO PLAN
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex gap-2 border-t border-slate-800/80 pt-3">
-                    <button
-                      onClick={() => {
-                        setEditingPkg(pkg);
-                        setPkgForm({
-                          name: pkg.name,
-                          price: pkg.price,
-                          discount_percent: pkg.discount_percent || 0,
-                          featureInput: '',
-                          features: pkg.features || []
-                        });
-                      }}
-                      className="flex-1 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 py-2 rounded-xl text-xs font-bold transition"
+                  <div className="flex items-center justify-between gap-1.5 bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
+                    <span className="uppercase text-[10px] font-bold text-emerald-400">
+                      {seller.payment_method}
+                    </span>
+                    <button 
+                      onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
+                      className="bg-slate-800 hover:bg-slate-700 text-xs px-2.5 py-1 rounded-lg text-emerald-400 font-bold"
                     >
-                      ✏️ Edit
+                      {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
                     </button>
-                    <button
-                      onClick={() => handleDeletePackage(pkg.id)}
-                      className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 py-2 rounded-xl text-xs font-bold transition"
+                  </div>
+
+                  <div className="flex justify-between items-center pt-1 text-xs">
+                    <span className="text-slate-400">Total Orders: <strong className="text-white">{seller.orders.length}</strong></span>
+                    <button 
+                      onClick={() => setSelectedSeller(seller)}
+                      className="bg-emerald-500 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs shadow"
                     >
-                      🗑️ Delete
+                      📊 View Dashboard
                     </button>
                   </div>
                 </div>
               ))}
             </div>
+
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                    <th className="p-3 w-16">Serial</th>
+                    <th className="p-3">Seller Name & Details</th>
+                    <th className="p-3">Membership Status</th>
+                    <th className="p-3">Wallet / Bank Details</th>
+                    <th className="p-3">Total Orders</th>
+                    <th className="p-3 text-right">Dashboard Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
+                  {sellersList.length === 0 ? (
+                    <tr><td colSpan={6} className="p-6 text-center text-slate-500">No sellers found.</td></tr>
+                  ) : (
+                    sellersList.map((seller, idx) => (
+                      <tr key={seller.id} className={`hover:bg-slate-800/20 ${seller.is_banned ? 'bg-rose-950/10' : ''}`}>
+                        <td className="p-3 font-mono font-bold text-emerald-400">#{idx + 1}</td>
+                        
+                        <td className="p-3">
+                          <div className="font-bold text-white text-sm flex items-center gap-2">
+                            {seller.name}
+                            {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black">BANNED</span>}
+                          </div>
+                          <div className="text-slate-300 text-[11px]">{seller.email}</div>
+                          <div className="text-slate-500 text-[10px]">{seller.phone}</div>
+                        </td>
+
+                        <td className="p-3">
+                          {seller.plan ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                              ACTIVE ({seller.plan})
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/30 tracking-wide">
+                              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                              NO PLAN (ONLY REGISTERED)
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="uppercase font-bold text-emerald-400">{seller.payment_method}</span>
+                            <button 
+                              onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
+                              className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] px-2 py-1 rounded-lg text-emerald-400 font-bold transition"
+                            >
+                              {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
+                            </button>
+                          </div>
+                        </td>
+
+                        <td className="p-3 font-semibold text-slate-200">{seller.orders.length} Orders</td>
+
+                        <td className="p-3 text-right">
+                          <button 
+                            onClick={() => setSelectedSeller(seller)}
+                            className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl transition text-xs shadow-md"
+                          >
+                            📊 View Seller Dashboard & Breakdown
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* TAB 4: ORDERS */}
+        {activeTab === 'orders' && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white">Live Reseller Orders Stream</h2>
+                <p className="text-[11px] sm:text-xs text-slate-400">Manage orders, seller details, and print custom invoices.</p>
+              </div>
+
+              {selectedOrderIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center bg-slate-950/90 border border-emerald-500/40 p-2.5 rounded-2xl w-full sm:w-auto justify-between">
+                  <span className="text-xs font-bold text-emerald-400">{selectedOrderIds.length} Selected</span>
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="bg-slate-800 text-xs text-white p-1.5 rounded-xl border border-slate-700">
+                      <option value="confirmed">Confirmed</option>
+                      <option value="in_transit">In Transit</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                    <button onClick={handleBulkStatusChange} disabled={bulkUpdating} className="bg-emerald-500 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-xl shrink-0 hover:bg-emerald-400 transition">
+                      {bulkUpdating ? '...' : 'Apply Status'}
+                    </button>
+                    <button onClick={handleBulkDeleteOrders} disabled={bulkUpdating} className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl shrink-0 transition">
+                      🗑️ Delete Selected
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="block md:hidden space-y-3">
+              {orders.map(o => (
+                <div key={o.id} className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => handleSelectOrder(o.id)} className="w-4 h-4 accent-emerald-500" />
+                      <div>
+                        <h4 className="font-bold text-white text-sm flex items-center gap-1.5">
+                          Customer: {o.customer_name}
+                          {o.status === 'cancel_requested' && <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.5 rounded font-black animate-pulse">CANCEL REQ</span>}
+                        </h4>
+                        <p className="text-slate-400 text-[11px]">{o.customer_phone}</p>
+                        {o.cancel_reason && <p className="text-[11px] text-amber-400 mt-1">Reason: "{o.cancel_reason}"</p>}
+                      </div>
+                    </div>
+                    <strong className="text-emerald-400 text-xs">৳{o.total_amount}</strong>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/80 text-xs gap-2">
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setManagingOrder(o)} className="px-2.5 py-1.5 bg-slate-800 text-emerald-400 rounded-xl font-bold text-[11px]">⚙️ Manage</button>
+                      <button onClick={() => handleDeleteOrder(o.id, o.customer_name)} className="px-2.5 py-1.5 bg-rose-500/10 text-rose-400 rounded-xl font-bold text-[11px]">🗑️ Delete</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                    <th className="p-3 w-[5%] text-center"><input type="checkbox" checked={orders.length > 0 && selectedOrderIds.length === orders.length} onChange={handleSelectAllOrders} className="w-4 h-4 accent-emerald-500" /></th>
+                    <th className="p-3 w-[25%]">Customer Info</th>
+                    <th className="p-3 w-[22%]">Seller / Shop Name</th>
+                    <th className="p-3 w-[18%]">Selling / Profit</th>
+                    <th className="p-3 w-[12%]">Status</th>
+                    <th className="p-3 w-[18%] text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
+                  {orders.map((o) => (
+                    <tr key={o.id} className="hover:bg-slate-800/20">
+                      <td className="p-3 text-center"><input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => handleSelectOrder(o.id)} className="w-4 h-4 accent-emerald-500" /></td>
+                      <td className="p-3">
+                        <div className="font-bold text-white flex items-center gap-1.5">
+                          {o.customer_name}
+                          {o.status === 'cancel_requested' && (
+                            <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black animate-pulse">
+                              CANCEL REQUESTED
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-slate-400 text-[11px]">{o.customer_phone}</div>
+                        {o.cancel_reason && (
+                          <div className="text-[11px] text-amber-400 mt-1 italic">
+                            💬 Cancel Reason: "{o.cancel_reason}"
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="font-bold text-amber-400">{o.seller_name}</div>
+                        <div className="text-slate-500 text-[10px]">{o.seller_phone}</div>
+                      </td>
+                      <td className="p-3">
+                        <div>Selling: <strong>৳{o.total_amount}</strong></div>
+                        <div className="text-emerald-400 font-semibold">Profit: ৳{o.profit_amount || 0}</div>
+                      </td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border capitalize ${
+                          o.status === 'cancel_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
+                          o.status === 'cancelled' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
+                          'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        }`}>
+                          {o.status === 'cancel_requested' ? 'Cancel Req' : o.status?.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button 
+                            onClick={() => setManagingOrder(o)}
+                            className={`px-2.5 py-1.5 rounded-xl font-bold transition text-[11px] whitespace-nowrap ${
+                              o.status === 'cancel_requested' 
+                                ? 'bg-rose-500 text-white animate-pulse' 
+                                : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700'
+                            }`}
+                          >
+                            {o.status === 'cancel_requested' ? '🚨 Review Cancel' : '⚙️ Manage'}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteOrder(o.id, o.customer_name)}
+                            className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl font-bold transition text-[11px] flex items-center gap-1 whitespace-nowrap"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: INVENTORY */}
+        {activeTab === 'inventory' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div className="bg-slate-900/60 border border-slate-800 p-4 sm:p-6 rounded-3xl h-fit">
+              <h3 className="text-base sm:text-lg font-bold text-white mb-4">➕ Add New Product</h3>
+              <form onSubmit={handleAddProduct} className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Product Title *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="e.g. Collagen Beauty Cream - 30g" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.title} 
+                    onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} 
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Category</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Skin Care" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                      value={newProduct.category} 
+                      onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Sub-Category</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Day Cream" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                      value={newProduct.sub_category} 
+                      onChange={(e) => setNewProduct({ ...newProduct, sub_category: e.target.value })} 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Base Price (৳) *</label>
+                    <input 
+                      type="number" 
+                      required 
+                      placeholder="300" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                      value={newProduct.base_price} 
+                      onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Suggested Price (৳) *</label>
+                    <input 
+                      type="number" 
+                      required 
+                      placeholder="500" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                      value={newProduct.suggested_price} 
+                      onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} 
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Product Images (Max 10 Files) *</label>
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*" 
+                    onChange={(e) => handleMultipleFilesChange(e, false)} 
+                    className="w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-slate-800 file:text-emerald-400" 
+                  />
+                  {mediaFiles.length > 0 && <p className="text-[10px] text-emerald-400 mt-1">✓ {mediaFiles.length} image(s) selected</p>}
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Product Information / Description</label>
+                  <textarea 
+                    rows={3} 
+                    placeholder="Enter detailed specifications..." 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.description} 
+                    onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} 
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Initial Stock Units</label>
+                  <input 
+                    type="number" 
+                    placeholder="10" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.stock} 
+                    onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={uploading} 
+                  className="w-full bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs transition hover:bg-emerald-400 shadow-lg shadow-emerald-500/20"
+                >
+                  {uploading ? 'Processing...' : '+ Save Product to Inventory'}
+                </button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6 space-y-3">
+              <h3 className="text-base sm:text-lg font-bold text-white mb-2">Inventory Catalogue ({products.length})</h3>
+              {products.map((p) => (
+                <div key={p.id} className="p-3 sm:p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-12 h-12 rounded-xl object-cover shrink-0" alt={p.name} />
+                    <div>
+                      <h4 className="font-bold text-white text-xs sm:text-sm">{p.name}</h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {p.category && (
+                          <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                            {p.category} {p.sub_category ? `› ${p.sub_category}` : ''}
+                          </span>
+                        )}
+                        <p className="text-[11px] text-slate-400">Base: ৳{p.price} | Stock: {p.stock || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <button onClick={() => setEditingProduct(p)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 transition">✏️ Edit</button>
+                    <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition">🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: PACKAGES */}
+        {activeTab === 'packages' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+            <div className="bg-slate-900/60 border border-slate-800 p-4 sm:p-6 rounded-3xl h-fit space-y-4">
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                {editingPkg ? '✏️ Edit Membership Package' : '➕ Create New Package'}
+              </h3>
+
+              <form onSubmit={handleSavePackage} className="space-y-3.5">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Package Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Basic, Advance, Premium"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:border-emerald-500 focus:outline-none"
+                    value={pkgForm.name}
+                    onChange={(e) => setPkgForm({ ...pkgForm, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Price (৳) *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="349"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none"
+                      value={pkgForm.price}
+                      onChange={(e) => setPkgForm({ ...pkgForm, price: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-slate-400 block mb-1">Discount (% Off)</label>
+                    <input
+                      type="number"
+                      placeholder="2 or 4"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none"
+                      value={pkgForm.discount_percent}
+                      onChange={(e) => setPkgForm({ ...pkgForm, discount_percent: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] text-slate-400 block">Rules & Benefits (Bullet Points)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. 2% Flat Discount on all products"
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none"
+                      value={pkgForm.featureInput}
+                      onChange={(e) => setPkgForm({ ...pkgForm, featureInput: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddFeatureToPkg}
+                      className="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-bold text-xs px-3 py-2 rounded-xl shrink-0"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  <div className="space-y-1 pt-1">
+                    {pkgForm.features.map((feat, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-slate-950/80 p-2 rounded-lg text-xs text-slate-300 border border-slate-800">
+                        <span className="truncate max-w-[200px]">• {feat}</span>
+                        <button type="button" onClick={() => handleRemoveFeature(idx)} className="text-rose-400 hover:text-rose-300 font-bold ml-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  {editingPkg && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPkg(null);
+                        setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
+                      }}
+                      className="w-1/2 bg-slate-800 text-slate-300 font-bold py-3 rounded-xl text-xs"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={savingPkg}
+                    className={`w-full ${editingPkg ? 'w-1/2 bg-amber-500 text-slate-950' : 'bg-emerald-500 text-slate-950'} font-bold py-3 rounded-xl text-xs transition hover:opacity-90`}
+                  >
+                    {savingPkg ? 'Saving...' : editingPkg ? 'Update Package' : '+ Save Package'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-bold text-white mb-2">Active Packages Catalogue ({packages.length})</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {packages.map((pkg) => (
+                  <div key={pkg.id} className="bg-slate-900/60 border border-slate-800 p-4 sm:p-5 rounded-3xl flex flex-col justify-between space-y-4 shadow-xl">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-base font-bold text-white uppercase">{pkg.name}</h4>
+                          <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-0.5">৳{pkg.price}</p>
+                        </div>
+                        <span className="text-[10px] uppercase font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full shrink-0">
+                          {pkg.discount_percent}% Off
+                        </span>
+                      </div>
+
+                      <div className="mt-3 space-y-1 border-t border-slate-800/80 pt-2.5">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Rules & Perks:</p>
+                        {pkg.features && pkg.features.length > 0 ? (
+                          pkg.features.map((f, idx) => (
+                            <p key={idx} className="text-xs text-slate-300 flex items-center gap-1.5">
+                              <span className="text-emerald-400 font-bold">✓</span> {f}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-xs text-slate-500 italic">No custom rules added.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 border-t border-slate-800/80 pt-3">
+                      <button
+                        onClick={() => {
+                          setEditingPkg(pkg);
+                          setPkgForm({
+                            name: pkg.name,
+                            price: pkg.price,
+                            discount_percent: pkg.discount_percent || 0,
+                            featureInput: '',
+                            features: pkg.features || []
+                          });
+                        }}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 py-2 rounded-xl text-xs font-bold transition"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeletePackage(pkg.id)}
+                        className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 py-2 rounded-xl text-xs font-bold transition"
+                      >
+                        🗑️ Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
 
       {/* 📊 SELLER DASHBOARD MODAL */}
       {selectedSeller && (
@@ -1987,7 +2031,6 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* 🏷️ Edit Category & Sub-Category Fields */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] text-slate-400 block mb-1">Category</label>
