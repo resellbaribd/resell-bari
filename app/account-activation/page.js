@@ -67,9 +67,9 @@ export default function AccountActivationPage() {
         <div className="max-w-7xl mx-auto px-6 sm:px-12 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <img 
-              src="/icon.svg" 
+              src="/logo.svg" 
               alt="Resell Bari" 
-              className="h-10 sm:h-12 w-auto object-contain"
+              className="h-12 sm:h-14 w-auto object-contain"
             />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
