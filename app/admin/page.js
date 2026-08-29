@@ -65,6 +65,9 @@ export default function AdminDashboard() {
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [paymentActionLoading, setPaymentActionLoading] = useState(null);
 
+  // 📱 Mobile Navigation State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   useEffect(() => {
     fetchAdminData();
     const channel = supabase.channel('schema-db-changes')
@@ -743,11 +746,51 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden">
       
+      {/* 📱 MOBILE HEADER */}
+      <div className="md:hidden sticky top-0 z-40 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 p-4 flex items-center justify-between shadow-lg">
+        <Link href="/" className="flex items-center gap-2.5">
+          <img src="/logo.svg" alt="Resell Bari" className="h-8 w-auto object-contain" />
+          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">Admin</span>
+        </Link>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)} 
+          className="text-slate-200 hover:text-white p-1 cursor-pointer"
+        >
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+      </div>
+
+      {/* 📱 MOBILE SIDEBAR OVERLAY */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* 🧭 PROFESSIONAL LEFT SIDEBAR NAVIGATION */}
-      <aside className="w-full md:w-72 bg-slate-900/95 border-r border-slate-800/80 p-6 flex flex-col justify-between shrink-0 md:min-h-screen md:sticky md:top-0 z-40 backdrop-blur-2xl">
-        <div className="space-y-8">
+      <aside className={`
+        fixed md:sticky top-0 left-0 z-50 h-screen overflow-y-auto
+        w-72 bg-slate-900/95 border-r border-slate-800/80 p-6 flex flex-col justify-between shrink-0 backdrop-blur-2xl
+        transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="space-y-8 relative">
           
-          {/* BRAND LOGO */}
+          {/* Mobile Close Button */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden absolute -top-2 -right-2 text-slate-400 hover:text-white p-2 cursor-pointer"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+
+          {/* BRAND LOGO (DESKTOP/SIDEBAR) */}
           <div className="px-2 pt-1">
             <Link href="/" className="inline-block">
               <img 
@@ -763,7 +806,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* LARGE & PROFESSIONAL MENU ITEMS */}
-          <nav className="space-y-2">
+          <nav className="space-y-2 mt-8 md:mt-0">
             {[
               { id: 'overview', label: 'Overview', icon: '📊' },
               { id: 'orders', label: 'Orders', icon: '📦', badge: pendingOrders.length },
@@ -774,7 +817,7 @@ export default function AdminDashboard() {
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }}
                 className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-extrabold transition cursor-pointer ${
                   activeTab === tab.id
                     ? 'bg-emerald-500 text-slate-950 shadow-xl shadow-emerald-500/20 translate-x-1'
@@ -800,10 +843,10 @@ export default function AdminDashboard() {
         </div>
 
         {/* SIDEBAR FOOTER */}
-        <div className="pt-6 border-t border-slate-800/80 space-y-3">
+        <div className="pt-6 border-t border-slate-800/80 space-y-3 mt-8">
           <Link 
             href="/products?mode=admin" 
-            className="w-full flex items-center gap-2.5 px-4 py-3 bg-slate-800/60 hover:bg-slate-800 text-amber-400 border border-slate-700/60 rounded-2xl text-xs font-bold transition justify-center"
+            className="w-full flex items-center gap-2.5 px-4 py-3 bg-slate-800/60 hover:bg-slate-800 text-amber-400 border border-slate-700/60 rounded-2xl text-xs font-bold transition justify-center cursor-pointer"
           >
             <span>👁️</span> View Shop Page
           </Link>
@@ -821,7 +864,7 @@ export default function AdminDashboard() {
       </aside>
 
       {/* 🖥️ FULL-WIDTH EXPANDED CONTENT AREA */}
-      <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen">
+      <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden">
         
         {/* HEADER BAR */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
@@ -986,12 +1029,12 @@ export default function AdminDashboard() {
                 <p className="text-xs text-slate-400 mt-1">Verify user transaction IDs, confirm payments, or decline requests.</p>
               </div>
 
-              <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 gap-1">
+              <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 gap-1 overflow-x-auto">
                 {['all', 'pending', 'approved', 'declined'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setPaymentFilter(tab)}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition cursor-pointer whitespace-nowrap ${
                       paymentFilter === tab
                         ? 'bg-emerald-500 text-slate-950 shadow'
                         : 'text-slate-400 hover:text-white'
@@ -1028,7 +1071,7 @@ export default function AdminDashboard() {
                           <div className="text-[11px] text-slate-500 mt-0.5">{new Date(req.created_at).toLocaleString()}</div>
                         </td>
                         <td className="p-4">
-                          <span className="px-3 py-1 bg-slate-800 text-emerald-400 rounded-lg text-xs font-bold uppercase">
+                          <span className="px-3 py-1 bg-slate-800 text-emerald-400 rounded-lg text-xs font-bold uppercase whitespace-nowrap">
                             {req.plan}
                           </span>
                         </td>
@@ -1037,20 +1080,20 @@ export default function AdminDashboard() {
                         <td className="p-4 font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2.5 py-1 rounded-md">
                           {req.transaction_id}
                         </td>
-                        <td className="p-4 font-bold text-white text-sm">{req.amount}</td>
+                        <td className="p-4 font-bold text-white text-sm whitespace-nowrap">{req.amount}</td>
                         <td className="p-4">
                           {req.status === 'pending' && (
-                            <span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-bold">
+                            <span className="px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-bold whitespace-nowrap">
                               ● Pending
                             </span>
                           )}
                           {req.status === 'approved' && (
-                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold">
+                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold whitespace-nowrap">
                               ✓ Approved
                             </span>
                           )}
                           {req.status === 'declined' && (
-                            <span className="px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-xs font-bold">
+                            <span className="px-3 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-xs font-bold whitespace-nowrap">
                               ✕ Declined
                             </span>
                           )}
@@ -1092,7 +1135,7 @@ export default function AdminDashboard() {
             <h2 className="text-xl font-bold text-white mb-1">👥 Reseller Management & Seller Hub</h2>
             <p className="text-xs text-slate-400 mb-6">View registered sellers, membership status, sales breakdown, and manage accounts.</p>
 
-            <div className="block md:hidden space-y-4">
+            <div className="block lg:hidden space-y-4">
               {sellersList.map((seller, idx) => (
                 <div key={seller.id} className={`p-4 bg-slate-950/80 border ${seller.is_banned ? 'border-rose-500/50' : 'border-slate-800'} rounded-2xl space-y-3`}>
                   <div className="flex justify-between items-start">
@@ -1122,12 +1165,12 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="flex items-center justify-between gap-2 bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/60">
-                    <span className="uppercase text-xs font-bold text-emerald-400">
+                    <span className="uppercase text-xs font-bold text-emerald-400 truncate max-w-[150px]">
                       {seller.payment_method}
                     </span>
                     <button 
                       onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)}
-                      className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1 rounded-lg text-emerald-400 font-bold cursor-pointer"
+                      className="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-1.5 rounded-lg text-emerald-400 font-bold cursor-pointer shrink-0"
                     >
                       {copiedId === seller.id ? '✓ Copied' : '📋 Copy'}
                     </button>
@@ -1146,7 +1189,7 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            <div className="hidden md:block overflow-x-auto w-full">
+            <div className="hidden lg:block overflow-x-auto w-full">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase border-b border-slate-800 font-bold">
@@ -1250,7 +1293,38 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            <div className="overflow-x-auto w-full">
+            <div className="block lg:hidden space-y-4">
+              {orders.map(o => (
+                <div key={o.id} className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-start gap-3">
+                      <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => handleSelectOrder(o.id)} className="w-4 h-4 accent-emerald-500 mt-1" />
+                      <div>
+                        <h4 className="font-bold text-white text-sm flex items-center gap-1.5">
+                          Customer: {o.customer_name}
+                        </h4>
+                        {o.status === 'cancel_requested' && <span className="inline-block mt-1 bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black animate-pulse">CANCEL REQ</span>}
+                        <p className="text-slate-400 text-xs mt-1">{o.customer_phone}</p>
+                        {o.cancel_reason && <p className="text-[11px] text-amber-400 mt-1.5 bg-amber-500/10 p-1.5 rounded-md">Reason: "{o.cancel_reason}"</p>}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                       <strong className="text-emerald-400 text-sm block">৳{o.total_amount}</strong>
+                       <span className="text-[10px] text-slate-500 uppercase mt-1">{o.status?.replace('_', ' ')}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-800/80 text-xs gap-2">
+                    <div className="flex gap-2">
+                      <button onClick={() => setManagingOrder(o)} className="px-3.5 py-2 bg-slate-800 text-emerald-400 rounded-xl font-bold text-xs">⚙️ Manage</button>
+                      <button onClick={() => handleDeleteOrder(o.id, o.customer_name)} className="px-3.5 py-2 bg-rose-500/10 text-rose-400 rounded-xl font-bold text-xs">🗑️ Delete</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden lg:block overflow-x-auto w-full">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase border-b border-slate-800 font-bold">
@@ -1270,15 +1344,15 @@ export default function AdminDashboard() {
                         <div className="font-bold text-white flex items-center gap-2 text-sm">
                           {o.customer_name}
                           {o.status === 'cancel_requested' && (
-                            <span className="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">
+                            <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black animate-pulse">
                               CANCEL REQUESTED
                             </span>
                           )}
                         </div>
                         <div className="text-slate-400 text-xs mt-0.5">{o.customer_phone}</div>
                         {o.cancel_reason && (
-                          <div className="text-xs text-amber-400 mt-1 italic">
-                            💬 Cancel Reason: "{o.cancel_reason}"
+                          <div className="text-xs text-amber-400 mt-1.5 bg-amber-500/10 p-1.5 rounded-md inline-block">
+                            💬 Reason: "{o.cancel_reason}"
                           </div>
                         )}
                       </td>
@@ -1440,12 +1514,12 @@ export default function AdminDashboard() {
             <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-lg">
               <h3 className="text-lg font-bold text-white mb-4">Inventory Catalogue ({products.length})</h3>
               {products.map((p) => (
-                <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center gap-4 hover:bg-slate-800/60 transition">
+                <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-slate-800/60 transition">
                   <div className="flex items-center gap-4">
                     <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover shrink-0" alt={p.name} />
                     <div>
                       <h4 className="font-bold text-white text-sm sm:text-base">{p.name}</h4>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         {p.category && (
                           <span className="text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg">
                             {p.category} {p.sub_category ? `› ${p.sub_category}` : ''}
@@ -1455,9 +1529,9 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setEditingProduct(p)} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 transition cursor-pointer">✏️ Edit</button>
-                    <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition cursor-pointer">🗑️</button>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button onClick={() => setEditingProduct(p)} className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 transition cursor-pointer text-center">✏️ Edit</button>
+                    <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition cursor-pointer text-center">🗑️</button>
                   </div>
                 </div>
               ))}
@@ -1563,10 +1637,10 @@ export default function AdminDashboard() {
               </form>
             </div>
 
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-4 w-full">
               <h3 className="text-lg font-bold text-white mb-2">Active Packages Catalogue ({packages.length})</h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
                 {packages.map((pkg) => (
                   <div key={pkg.id} className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between space-y-6 shadow-lg">
                     <div>
@@ -1630,22 +1704,22 @@ export default function AdminDashboard() {
       {selectedSeller && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl w-full max-w-4xl space-y-6 shadow-2xl relative my-8">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
               <div>
                 <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
                   📊 Seller Dashboard: {selectedSeller.name}
                 </h3>
-                <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
                   Email: <span className="text-slate-200">{selectedSeller.email}</span> | Phone: {selectedSeller.phone || 'N/A'} | Wallet Details: <strong className="text-emerald-400 uppercase">{selectedSeller.payment_method}</strong>
                   <button 
                     onClick={() => handleCopyWallet(selectedSeller.raw_bkash_number || selectedSeller.payment_method, selectedSeller.id)}
-                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1 rounded-lg text-emerald-400 font-bold transition cursor-pointer"
+                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] px-2.5 py-0.5 rounded-lg text-emerald-400 font-bold transition cursor-pointer"
                   >
                     {copiedId === selectedSeller.id ? '✓ Copied' : '📋 Copy Details'}
                   </button>
                 </p>
               </div>
-              <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
+              <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer bg-slate-800 px-3 py-1 rounded-lg">✕</button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1670,8 +1744,8 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-white uppercase tracking-wider">Sales Breakdown & History</h4>
               
-              <div className="max-h-72 overflow-y-auto border border-slate-800 rounded-2xl">
-                <table className="w-full text-left border-collapse">
+              <div className="max-h-72 overflow-x-auto overflow-y-auto border border-slate-800 rounded-2xl">
+                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase border-b border-slate-800 sticky top-0 bg-slate-900 font-bold">
                       <th className="p-3">Order ID</th>
@@ -1841,7 +1915,7 @@ export default function AdminDashboard() {
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">Invoice ID: #{managingOrder.id ? managingOrder.id.substring(0, 8) : ''}</p>
               </div>
-              <button onClick={() => setManagingOrder(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
+              <button onClick={() => setManagingOrder(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer bg-slate-800 px-3 py-1 rounded-lg">✕</button>
             </div>
 
             {managingOrder.status === 'cancel_requested' && (
@@ -1990,65 +2064,65 @@ export default function AdminDashboard() {
 
       {/* ✏️ EDIT PRODUCT MODAL */}
       {editingProduct && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl w-full max-w-lg space-y-4 shadow-2xl relative my-8">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-base sm:text-lg font-bold text-white">✏️ Edit Product</h3>
-              <button onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
+              <button onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer bg-slate-800 px-3 py-1 rounded-lg">✕</button>
             </div>
 
-            <form onSubmit={handleUpdateProduct} className="space-y-3">
+            <form onSubmit={handleUpdateProduct} className="space-y-4">
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Product Title</label>
+                <label className="text-xs text-slate-400 block mb-1 font-semibold">Product Title</label>
                 <input 
                   type="text" 
                   required 
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                  className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" 
                   value={editingProduct.name || editingProduct.title || ''} 
                   onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value, title: e.target.value })} 
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Category</label>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Category</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Skin Care" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" 
                     value={editingProduct.category || ''} 
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })} 
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Sub-Category</label>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Sub-Category</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Day Cream" 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" 
                     value={editingProduct.sub_category || ''} 
                     onChange={(e) => setEditingProduct({ ...editingProduct, sub_category: e.target.value })} 
                   />
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Base Price (৳)</label>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Base Price (৳)</label>
                   <input 
                     type="number" 
                     required 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" 
                     value={editingProduct.price ?? editingProduct.base_price ?? ''} 
                     onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value, base_price: e.target.value })} 
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Suggested Price (৳)</label>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Suggested Price (৳)</label>
                   <input 
                     type="number" 
                     required 
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" 
                     value={editingProduct.suggested_price || ''} 
                     onChange={(e) => setEditingProduct({ ...editingProduct, suggested_price: e.target.value })} 
                   />
@@ -2056,23 +2130,23 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Replace Product Images (Max 10)</label>
+                <label className="text-xs text-slate-400 block mb-1 font-semibold">Replace Product Images (Max 10)</label>
                 <input type="file" multiple accept="image/*" onChange={(e) => handleMultipleFilesChange(e, true)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-slate-800 file:text-emerald-400 cursor-pointer" />
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Product Description</label>
-                <textarea rows={3} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none" value={editingProduct.description || ''} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} />
+                <label className="text-xs text-slate-400 block mb-1 font-semibold">Product Description</label>
+                <textarea rows={3} className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" value={editingProduct.description || ''} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} />
               </div>
 
               <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Stock Units</label>
-                <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} />
+                <label className="text-xs text-slate-400 block mb-1 font-semibold">Stock Units</label>
+                <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} />
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }} className="w-1/2 bg-slate-800 text-slate-300 font-bold py-3 rounded-xl text-xs cursor-pointer">Cancel/Close</button>
-                <button type="submit" disabled={editUploading} className="w-1/2 bg-emerald-500 text-slate-950 font-bold py-3 rounded-xl text-xs cursor-pointer">{editUploading ? 'Updating...' : 'Save Changes'}</button>
+                <button type="button" onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }} className="w-1/2 bg-slate-800 text-slate-300 font-bold py-3.5 rounded-2xl text-xs cursor-pointer">Cancel</button>
+                <button type="submit" disabled={editUploading} className="w-1/2 bg-emerald-500 text-slate-950 font-bold py-3.5 rounded-2xl text-xs cursor-pointer">{editUploading ? 'Updating...' : 'Save Changes'}</button>
               </div>
             </form>
           </div>
