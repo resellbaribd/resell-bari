@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { sendEmailNotification } from '@/lib/email';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -61,9 +62,11 @@ export default function AdminDashboard() {
   const [banForm, setBanForm] = useState({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' });
   const [isBanning, setIsBanning] = useState(false);
 
-  // 💳 Payment Request Filter & Action Loading
+  // 💳 Payment Request States & Decline Modal
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [paymentActionLoading, setPaymentActionLoading] = useState(null);
+  const [decliningPaymentReq, setDecliningPaymentReq] = useState(null);
+  const [paymentDeclineReason, setPaymentDeclineReason] = useState('');
 
   // 📱 Mobile Navigation State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -132,7 +135,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // 💳 Payment Request Actions
+  // 💳 Payment Request Actions with Automatic Email Trigger
   async function handleApprovePayment(request) {
     if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
     setPaymentActionLoading(request.id);
@@ -144,6 +147,7 @@ export default function AdminDashboard() {
 
       if (reqErr) throw reqErr;
 
+      // Update User Plan in Profiles table
       if (request.user_id) {
         const cleanPlan = request.plan?.toLowerCase()?.replace(' reseller', '') || 'basic';
         await supabase
@@ -155,7 +159,31 @@ export default function AdminDashboard() {
           .eq('id', request.user_id);
       }
 
-      alert('Payment confirmed and user plan activated successfully!');
+      // ✉️ Send Approval & Congratulations Email
+      if (request.email) {
+        const emailBody = `
+Congratulations! Your Resell Bari Membership has been Activated!
+
+Plan: ${request.plan}
+Amount: ${request.amount}
+Transaction ID: ${request.transaction_id}
+
+Your reseller account is now fully active with special wholesale advantages.
+You can log in to your dashboard now using the link below:
+
+Dashboard Login: https://resellbari.com/login
+
+Thank you for choosing Resell Bari!
+        `;
+
+        await sendEmailNotification({
+          to_email: request.email,
+          subject: '🎉 Congratulations! Your Resell Bari Membership is Active',
+          message: emailBody,
+        });
+      }
+
+      alert('Payment confirmed, account activated, and confirmation email sent to user!');
       fetchAdminData();
     } catch (err) {
       alert('Error approving payment: ' + err.message);
@@ -164,18 +192,56 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleDeclinePayment(request) {
-    if (!confirm(`Are you sure you want to decline this payment (TrxID: ${request.transaction_id})?`)) return;
+  async function handleConfirmDeclinePayment(e) {
+    e.preventDefault();
+    if (!paymentDeclineReason.trim()) return alert('Please enter a reason for declining!');
+    const request = decliningPaymentReq;
     setPaymentActionLoading(request.id);
+
     try {
       const { error } = await supabase
         .from('activation_requests')
-        .update({ status: 'declined' })
+        .update({ 
+          status: 'declined',
+          decline_reason: paymentDeclineReason 
+        })
         .eq('id', request.id);
 
       if (error) throw error;
 
-      alert('Payment request has been declined.');
+      // ✉️ Send Decline Email with Issue Details
+      if (request.email) {
+        const declineBody = `
+Hello,
+
+Your membership activation payment request for the ${request.plan} plan has been declined by the administration.
+
+Details Submitted:
+- Method: ${request.payment_method}
+- Sender Phone: ${request.phone_number}
+- TrxID: ${request.transaction_id}
+
+Reason for Decline:
+"${paymentDeclineReason}"
+
+If this was a mistake or you entered the wrong Transaction ID, please log in and submit the correct payment details again or contact support.
+
+Support & Login: https://resellbari.com/login
+
+Regards,
+Resell Bari Team
+        `;
+
+        await sendEmailNotification({
+          to_email: request.email,
+          subject: '⚠️ Resell Bari Membership Payment Status Update',
+          message: declineBody,
+        });
+      }
+
+      alert('Payment declined and notification email sent to user.');
+      setDecliningPaymentReq(null);
+      setPaymentDeclineReason('');
       fetchAdminData();
     } catch (err) {
       alert('Error declining payment: ' + err.message);
@@ -782,7 +848,6 @@ export default function AdminDashboard() {
       `}>
         <div className="space-y-8 relative">
           
-          {/* Mobile Close Button */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden absolute -top-2 -right-2 text-slate-400 hover:text-white p-2 cursor-pointer"
@@ -790,7 +855,6 @@ export default function AdminDashboard() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
 
-          {/* BRAND LOGO (DESKTOP/SIDEBAR) */}
           <div className="px-2 pt-1">
             <Link href="/" className="inline-block">
               <img 
@@ -805,7 +869,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* LARGE & PROFESSIONAL MENU ITEMS */}
           <nav className="space-y-2 mt-8 md:mt-0">
             {[
               { id: 'overview', label: 'Overview', icon: '📊' },
@@ -842,7 +905,6 @@ export default function AdminDashboard() {
           </nav>
         </div>
 
-        {/* SIDEBAR FOOTER */}
         <div className="pt-6 border-t border-slate-800/80 space-y-3 mt-8">
           <Link 
             href="/products?mode=admin" 
@@ -863,7 +925,7 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* 🖥️ FULL-WIDTH EXPANDED CONTENT AREA */}
+      {/* 🖥️ MAIN CONTENT AREA */}
       <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden">
         
         {/* HEADER BAR */}
@@ -880,7 +942,6 @@ export default function AdminDashboard() {
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-6 w-full">
-            {/* 💳 PENDING PAYMENTS ALERT */}
             {pendingPayments.length > 0 && (
               <div className="bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-teal-500/5 border-2 border-emerald-500/50 rounded-3xl p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-pulse w-full">
                 <div className="flex items-center gap-4">
@@ -949,7 +1010,6 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* FULL WIDTH STATS GRID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
               <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
                 <p className="text-xs text-slate-400 uppercase font-semibold">Total Orders</p>
@@ -969,7 +1029,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* FULL WIDTH EXPANDED GRAPH */}
             <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full shadow-lg">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
@@ -1026,7 +1085,7 @@ export default function AdminDashboard() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
               <div>
                 <h2 className="text-xl font-bold text-white">💳 Membership Payment & Activation Requests</h2>
-                <p className="text-xs text-slate-400 mt-1">Verify user transaction IDs, confirm payments, or decline requests.</p>
+                <p className="text-xs text-slate-400 mt-1">Verify user transaction IDs, confirm payments, or decline requests with custom reason.</p>
               </div>
 
               <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 gap-1 overflow-x-auto">
@@ -1109,7 +1168,7 @@ export default function AdminDashboard() {
                                 Confirm
                               </button>
                               <button
-                                onClick={() => handleDeclinePayment(req)}
+                                onClick={() => { setDecliningPaymentReq(req); setPaymentDeclineReason(''); }}
                                 disabled={paymentActionLoading === req.id}
                                 className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2 rounded-xl text-xs font-extrabold transition disabled:opacity-50 cursor-pointer"
                               >
@@ -1700,6 +1759,61 @@ export default function AdminDashboard() {
 
       </main>
 
+      {/* 🔴 DECLINE PAYMENT WITH REASON MODAL */}
+      <AnimatePresence>
+        {decliningPaymentReq && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-slate-900 border border-rose-900/60 rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative space-y-4"
+            >
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 className="text-lg font-bold text-rose-500">Decline Payment Request</h3>
+                <button onClick={() => setDecliningPaymentReq(null)} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
+              </div>
+
+              <div className="text-xs text-slate-300 space-y-1 bg-slate-950 p-3 rounded-2xl border border-slate-800">
+                <p>User: <strong className="text-white">{decliningPaymentReq.email}</strong></p>
+                <p>TrxID: <strong className="text-emerald-400 font-mono">{decliningPaymentReq.transaction_id}</strong> | Phone: {decliningPaymentReq.phone_number}</p>
+              </div>
+
+              <form onSubmit={handleConfirmDeclinePayment} className="space-y-4">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Reason for Decline (Sent via email to User) *</label>
+                  <textarea 
+                    required
+                    rows={3}
+                    placeholder="e.g. Invalid Transaction ID, payment not received in bKash, etc."
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-rose-500"
+                    value={paymentDeclineReason}
+                    onChange={(e) => setPaymentDeclineReason(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button 
+                    type="button" 
+                    onClick={() => setDecliningPaymentReq(null)}
+                    className="w-1/2 bg-slate-800 text-slate-300 py-3 rounded-xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={paymentActionLoading === decliningPaymentReq.id}
+                    className="w-1/2 bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    {paymentActionLoading === decliningPaymentReq.id ? 'Sending...' : 'Decline & Send Email'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* 📊 SELLER DASHBOARD MODAL */}
       {selectedSeller && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -1709,17 +1823,17 @@ export default function AdminDashboard() {
                 <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
                   📊 Seller Dashboard: {selectedSeller.name}
                 </h3>
-                <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
                   Email: <span className="text-slate-200">{selectedSeller.email}</span> | Phone: {selectedSeller.phone || 'N/A'} | Wallet Details: <strong className="text-emerald-400 uppercase">{selectedSeller.payment_method}</strong>
                   <button 
                     onClick={() => handleCopyWallet(selectedSeller.raw_bkash_number || selectedSeller.payment_method, selectedSeller.id)}
-                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] px-2.5 py-0.5 rounded-lg text-emerald-400 font-bold transition cursor-pointer"
+                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1 rounded-lg text-emerald-400 font-bold transition cursor-pointer"
                   >
                     {copiedId === selectedSeller.id ? '✓ Copied' : '📋 Copy Details'}
                   </button>
                 </p>
               </div>
-              <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer bg-slate-800 px-3 py-1 rounded-lg">✕</button>
+              <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1744,8 +1858,8 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-white uppercase tracking-wider">Sales Breakdown & History</h4>
               
-              <div className="max-h-72 overflow-x-auto overflow-y-auto border border-slate-800 rounded-2xl">
-                <table className="w-full text-left border-collapse min-w-[600px]">
+              <div className="max-h-72 overflow-y-auto border border-slate-800 rounded-2xl">
+                <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase border-b border-slate-800 sticky top-0 bg-slate-900 font-bold">
                       <th className="p-3">Order ID</th>
@@ -2136,12 +2250,12 @@ export default function AdminDashboard() {
 
               <div>
                 <label className="text-xs text-slate-400 block mb-1 font-semibold">Product Description</label>
-                <textarea rows={3} className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" value={editingProduct.description || ''} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} />
+                <textarea rows={3} className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none" value={editingProduct.description || ''} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} />
               </div>
 
               <div>
                 <label className="text-xs text-slate-400 block mb-1 font-semibold">Stock Units</label>
-                <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3.5 text-xs text-white focus:outline-none" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} />
+                <input type="number" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none" value={editingProduct.stock || 0} onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} />
               </div>
 
               <div className="flex gap-3 pt-2">
