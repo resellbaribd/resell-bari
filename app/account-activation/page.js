@@ -69,7 +69,7 @@ export default function AccountActivationPage() {
             <img 
               src="/logo.svg" 
               alt="Resell Bari" 
-              className="h-12 sm:h-14 w-auto object-contain"
+              className="h-10 sm:h-12 w-auto object-contain"
             />
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
@@ -572,7 +572,7 @@ export default function AccountActivationPage() {
           <div className="space-y-4">
             <Link href="/" className="flex items-center">
               <img 
-                src="/icon.svg" 
+                src="/logo.svg" 
                 alt="Resell Bari" 
                 className="h-9 w-auto object-contain"
               />
