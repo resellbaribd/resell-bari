@@ -11,16 +11,20 @@ export default function AccountActivationPage() {
   const [user, setUser] = useState(null);
 
   // Modal & Payment State
-  const [selectedPlan, setSelectedPlan] = useState(null); // { name: 'Basic', price: '349৳' }
+  const [selectedPlan, setSelectedPlan] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Form State
   const [method, setMethod] = useState('bKash');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [transactionId, setTransactionId] = useState('');
   const [screenshot, setScreenshot] = useState(null);
+
+  // Payment Number
+  const paymentNumber = "01700000000";
 
   // 30 Minutes Countdown State (1800 seconds)
   const [timeLeft, setTimeLeft] = useState(1800);
@@ -80,12 +84,17 @@ export default function AccountActivationPage() {
     setIsModalOpen(true);
   };
 
+  const handleCopyNumber = () => {
+    navigator.clipboard.writeText(paymentNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
-      // Supabase-এ পেমেন্ট রিকোয়েস্ট সংরক্ষণ
       const { error } = await supabase
         .from('activation_requests')
         .insert([
@@ -109,7 +118,7 @@ export default function AccountActivationPage() {
       setIsSubmitted(true);
     } catch (err) {
       console.error('Submission error:', err);
-      setIsSubmitted(true); // ফলব্যাক হিসেবে কাউন্টডাউন চালু
+      setIsSubmitted(true);
     } finally {
       setSubmitting(false);
     }
@@ -160,10 +169,9 @@ export default function AccountActivationPage() {
 
       <main className="max-w-7xl mx-auto px-6 sm:px-12 py-12 sm:py-20 space-y-20 sm:space-y-32 relative z-10">
 
-        {/* ACCOUNT ACTIVATION HERO SECTION */}
+        {/* HERO SECTION */}
         <section className="bg-white/80 backdrop-blur-2xl border border-slate-200/80 rounded-3xl p-8 sm:p-16 shadow-sm relative overflow-hidden">
           <div className="max-w-4xl space-y-8">
-            
             <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 ✓ Registration Completed
@@ -204,11 +212,10 @@ export default function AccountActivationPage() {
                 <span className="text-slate-400 block text-xs">○ Next Step</span>
               </div>
             </div>
-
           </div>
         </section>
 
-        {/* MEMBERSHIP PLAN SECTION */}
+        {/* PACKAGES SECTION */}
         <section id="packages" className="space-y-12 scroll-mt-28">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900">
@@ -220,8 +227,7 @@ export default function AccountActivationPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            
-            {/* BASIC PLAN */}
+            {/* BASIC */}
             <div className="bg-white border border-slate-200/80 hover:border-slate-300 p-8 sm:p-10 rounded-3xl shadow-sm hover:shadow-md flex flex-col justify-between transition-all">
               <div className="space-y-8">
                 <div>
@@ -259,7 +265,7 @@ export default function AccountActivationPage() {
               </button>
             </div>
 
-            {/* ADVANCE PLAN */}
+            {/* ADVANCE */}
             <div className="bg-white border border-amber-200/80 hover:border-amber-300 p-8 sm:p-10 rounded-3xl shadow-sm hover:shadow-md flex flex-col justify-between transition-all">
               <div className="space-y-8">
                 <div>
@@ -297,7 +303,7 @@ export default function AccountActivationPage() {
               </button>
             </div>
 
-            {/* PREMIUM PLAN */}
+            {/* PREMIUM */}
             <div className="bg-white border-2 border-emerald-500 p-8 sm:p-10 rounded-3xl shadow-xl shadow-emerald-500/10 flex flex-col justify-between transition-all relative overflow-hidden">
               <div className="absolute top-5 right-5 bg-emerald-500 text-white text-xs font-black uppercase tracking-wider px-3.5 py-1.5 rounded-full shadow-sm">
                 Best Value
@@ -338,11 +344,10 @@ export default function AccountActivationPage() {
                 Premium Activate করুন
               </button>
             </div>
-
           </div>
         </section>
 
-        {/* MEMBERSHIP BENEFITS SECTION */}
+        {/* BENEFITS SECTION */}
         <section id="benefits" className="space-y-12 scroll-mt-28">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900">
@@ -354,7 +359,7 @@ export default function AccountActivationPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
+            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">💎</div>
               <h3 className="text-lg font-bold text-slate-900">বিশেষ Wholesale Price</h3>
               <p className="text-sm text-slate-600 leading-relaxed">
@@ -362,7 +367,7 @@ export default function AccountActivationPage() {
               </p>
             </div>
 
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
+            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">📦</div>
               <h3 className="text-lg font-bold text-slate-900">পণ্য নিয়ে ব্যবসার সুযোগ</h3>
               <p className="text-sm text-slate-600 leading-relaxed">
@@ -370,35 +375,11 @@ export default function AccountActivationPage() {
               </p>
             </div>
 
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
+            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm">
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">🏷️</div>
               <h3 className="text-lg font-bold text-slate-900">নিজের Selling Price</h3>
               <p className="text-sm text-slate-600 leading-relaxed">
                 আপনার Market ও Business Strategy অনুযায়ী Selling Price নির্ধারণ করে নিজের Margin তৈরি করতে পারবেন।
-              </p>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">🤝</div>
-              <h3 className="text-lg font-bold text-slate-900">Reseller Support</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Product ও Reselling সংক্রান্ত প্রয়োজনীয় বিষয়ে নির্ধারিত Support সুবিধা পাবেন।
-              </p>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">📈</div>
-              <h3 className="text-lg font-bold text-slate-900">Business Growth</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Customer এবং Order বাড়ার সঙ্গে সঙ্গে আপনার Reselling Business ধীরে ধীরে Scale করার সুযোগ থাকবে।
-              </p>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">🌐</div>
-              <h3 className="text-lg font-bold text-slate-900">একাধিক Business Channel</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Facebook Page, Website, TikTok, WhatsApp এবং অন্যান্য Online Channel ব্যবহার করে Product বিক্রি করতে পারবেন।
               </p>
             </div>
           </div>
@@ -425,26 +406,6 @@ export default function AccountActivationPage() {
                 Registration সম্পন্ন হলে আপনার Account তৈরি হবে। Reseller সুবিধা ব্যবহার করতে একটি Membership Plan নির্বাচন করে Activation সম্পন্ন করতে হবে।
               </p>
             </details>
-
-            <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-lg">
-              <summary className="flex items-center justify-between font-bold text-slate-900">
-                Membership Plan কত টাকা?
-                <span className="transition group-open:rotate-180 text-emerald-600 text-lg">▼</span>
-              </summary>
-              <p className="mt-4 text-slate-600 leading-relaxed border-t border-slate-100 pt-4 text-sm">
-                বর্তমানে Basic 349৳, Advance 549৳ এবং Premium 999৳—এই তিনটি Membership Plan রয়েছে।
-              </p>
-            </details>
-
-            <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-sm">
-              <summary className="flex items-center justify-between font-bold text-slate-900">
-                কোন Plan-এ সবচেয়ে কম Wholesale Price পাওয়া যাবে?
-                <span className="transition group-open:rotate-180 text-emerald-600 text-lg">▼</span>
-              </summary>
-              <p className="mt-4 text-slate-600 leading-relaxed border-t border-slate-100 pt-4 text-sm">
-                Premium Plan-এ Basic Plan-এর তুলনায় সর্বোচ্চ 4% কম Wholesale Price-এর সুবিধা থাকবে।
-              </p>
-            </details>
           </div>
         </section>
 
@@ -459,7 +420,7 @@ export default function AccountActivationPage() {
             {!isSubmitted && (
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 text-2xl font-bold transition"
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 text-2xl font-bold transition cursor-pointer"
               >
                 ✕
               </button>
@@ -478,10 +439,40 @@ export default function AccountActivationPage() {
                   </p>
                 </div>
 
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-1">
-                  <p className="font-bold text-slate-800">Send Money / Payment Number:</p>
-                  <p className="font-mono text-emerald-700 font-bold text-sm">01700000000 (Personal/Merchant)</p>
-                  <p className="text-slate-400">টাকা পাঠানোর পর নিচের তথ্যগুলো পূরণ করে সাবমিট করুন।</p>
+                {/* COPYABLE NUMBER BOX */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Send Money / Payment Number:</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyNumber}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+                    >
+                      {copied ? (
+                        <>
+                          <span className="text-xs">✓</span> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-emerald-700 font-extrabold text-base sm:text-lg select-all">
+                      {paymentNumber}
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">(Personal/Merchant)</span>
+                  </div>
+
+                  <p className="text-xs text-slate-400 border-t border-slate-200/60 pt-2">
+                    টাকা পাঠানোর পর নিচের তথ্যগুলো পূরণ করে সাবমিট করুন।
+                  </p>
                 </div>
 
                 {/* Method Selection */}
@@ -561,7 +552,6 @@ export default function AccountActivationPage() {
                   </p>
                 </div>
 
-                {/* COUNTDOWN TIMER */}
                 <div className="bg-slate-900 text-emerald-400 p-6 rounded-3xl border border-slate-800 max-w-xs mx-auto shadow-inner">
                   <span className="text-xs uppercase tracking-widest text-slate-400 font-bold block mb-1">Time Remaining</span>
                   <span className="text-4xl sm:text-5xl font-mono font-black tracking-wider">
