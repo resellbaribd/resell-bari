@@ -16,6 +16,9 @@ export default function ResellerDashboard() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showPkgModal, setShowPkgModal] = useState(false);
 
+  // 📱 Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // 🔴 Ban Countdown State
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, expired: false, isPermanent: false });
 
@@ -68,7 +71,7 @@ export default function ResellerDashboard() {
       if (difference <= 0) {
         clearInterval(interval);
         setTimeLeft({ hours: 0, minutes: 0, seconds: 0, expired: true, isPermanent: false });
-        fetchProfileAndOrders(); // Re-fetch to auto unlock dashboard
+        fetchProfileAndOrders();
       } else {
         const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)) + Math.floor(difference / (1000 * 60 * 60 * 24)) * 24;
         const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
@@ -133,7 +136,6 @@ export default function ResellerDashboard() {
     }
   }
 
-  // 🔴 Send Cancel Request with Reason to Admin
   async function handleSendCancelRequest(e) {
     e.preventDefault();
     if (!cancelReason.trim()) return alert('Please enter a reason for cancellation!');
@@ -202,9 +204,9 @@ export default function ResellerDashboard() {
   const isBanned = profile?.is_banned;
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 p-4 sm:p-8 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden">
       
-      {/* 🛑 BAN OVERLAY (BLURS DASHBOARD WHEN SELLER IS BANNED) */}
+      {/* 🛑 BAN OVERLAY */}
       {isBanned && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4">
           <motion.div 
@@ -232,7 +234,6 @@ export default function ResellerDashboard() {
               </div>
             )}
 
-            {/* Countdown Box */}
             <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl">
               <span className="text-[11px] text-slate-400 block uppercase font-bold tracking-wider mb-2">Access Restored In</span>
               {timeLeft.isPermanent ? (
@@ -259,7 +260,7 @@ export default function ResellerDashboard() {
 
             <button
               onClick={handleLogout}
-              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold py-3 rounded-2xl text-xs transition"
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold py-3 rounded-2xl text-xs transition cursor-pointer"
             >
               🚪 Logout From Dashboard
             </button>
@@ -267,108 +268,190 @@ export default function ResellerDashboard() {
         </div>
       )}
 
-      {/* Main Dashboard Container */}
-      <div className={isBanned ? 'pointer-events-none select-none filter blur-md' : ''}>
-        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
-        
-        {/* Profile Header */}
-        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 relative z-10 shadow-2xl">
-          <div className="flex items-center gap-4">
+      {/* 📱 MOBILE HEADER */}
+      <div className="md:hidden sticky top-0 z-40 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 p-4 flex items-center justify-between shadow-lg">
+        <Link href="/" className="flex items-center gap-2.5">
+          <img src="/logo.svg" alt="Resell Bari" className="h-8 w-auto object-contain" />
+          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">Reseller</span>
+        </Link>
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)} 
+          className="text-slate-200 hover:text-white p-1 cursor-pointer"
+        >
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+      </div>
+
+      {/* 📱 MOBILE SIDEBAR OVERLAY */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 🧭 PROFESSIONAL LEFT SIDEBAR NAVIGATION */}
+      <aside className={`
+        fixed md:sticky top-0 left-0 z-50 h-screen overflow-y-auto
+        w-72 bg-slate-900/95 border-r border-slate-800/80 p-6 flex flex-col justify-between shrink-0 backdrop-blur-2xl
+        transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="space-y-6 relative">
+          {/* Mobile Close Button */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden absolute -top-2 -right-2 text-slate-400 hover:text-white p-2 cursor-pointer"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+
+          {/* BRAND LOGO */}
+          <div className="px-2 pt-1">
+            <Link href="/" className="inline-block">
+              <img 
+                src="/logo.svg" 
+                alt="Resell Bari Logo" 
+                className="h-10 sm:h-11 w-auto object-contain"
+              />
+            </Link>
+            <div className="mt-2.5 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Reseller Portal</span>
+            </div>
+          </div>
+
+          {/* USER PROFILE MINI CARD */}
+          <div className="bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl flex items-center gap-3">
             {loading ? (
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-800 animate-pulse" />
+              <div className="w-12 h-12 rounded-xl bg-slate-800 animate-pulse shrink-0" />
             ) : (
               <img 
                 src={userAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
                 alt="Profile Avatar" 
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-500/50 shadow-md"
+                className="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 shrink-0"
               />
             )}
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-white">
-                  {loading ? 'Loading...' : (profile?.full_name || 'Reseller')}
-                </h1>
-                <span className={`text-[10px] sm:text-xs px-3 py-1 rounded-full border uppercase ${planBadgeStyle[currentPlan] || planBadgeStyle.basic}`}>
-                  👑 {currentPlan} Member
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">{loading ? '...' : (profile?.phone || '')}</p>
-              <p className="text-xs text-emerald-400/90 mt-1 italic">{loading ? '...' : (profile?.bio || '')}</p>
+            <div className="overflow-hidden">
+              <h4 className="font-bold text-white text-sm truncate">{profile?.full_name || 'Reseller'}</h4>
+              <span className={`text-[9px] px-2 py-0.5 rounded-full border uppercase inline-block mt-0.5 ${planBadgeStyle[currentPlan] || planBadgeStyle.basic}`}>
+                {currentPlan}
+              </span>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2.5 w-full sm:w-auto items-center">
-            {isEligibleForBlink && (
-              <button
-                onClick={() => setShowPkgModal(true)}
-                className="flex-1 sm:flex-none bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-amber-300 font-extrabold px-4.5 py-3 rounded-2xl text-xs sm:text-sm shadow-xl shadow-purple-500/25 animate-pulse border border-amber-400/60 flex items-center justify-center gap-2 transition"
-              >
-                <span className="text-base drop-shadow-md">👑</span>
-                <span className="text-white drop-shadow">Upgrade Package</span>
-              </button>
-            )}
-
-            {/* 🛍️ Products Page Button */}
-            <Link
-              href="/products"
-              className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 px-4 py-3 rounded-2xl font-semibold text-xs sm:text-sm transition text-center block shadow-md"
-            >
-              🛍️ Products
-            </Link>
-
-            <button 
-              onClick={() => router.push('/profile')}
-              className="flex-1 sm:flex-none border border-slate-700 hover:bg-slate-800 text-slate-200 px-4 py-3 rounded-2xl font-semibold text-xs sm:text-sm transition"
-            >
-              ⚙️ Edit Profile
-            </button>
-            <button 
-              onClick={() => router.push('/profile?tab=payment')}
-              className="flex-1 sm:flex-none bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-3 rounded-2xl font-semibold text-xs sm:text-sm transition"
-            >
-              💳 Payout Methods
-            </button>
-            
+          {/* NAVIGATION LINKS */}
+          <nav className="space-y-1.5 pt-2">
             <Link
               href="/orders/new"
-              className="flex-1 sm:flex-none bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-5 py-3 rounded-2xl shadow-lg shadow-emerald-500/20 transition active:scale-95 text-xs sm:text-sm text-center block"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-emerald-500/20 transition mb-3"
             >
-              + Create New Order
+              <span className="text-base">➕</span>
+              <span className="tracking-wide">Create New Order</span>
             </Link>
 
-            <button
-              onClick={handleLogout}
-              className="flex-1 sm:flex-none bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-3 rounded-2xl font-semibold text-xs sm:text-sm transition"
+            <Link
+              href="/products"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 transition"
             >
-              🚪 Logout
+              <span className="text-lg">🛍️</span>
+              <span>Browse Products</span>
+            </Link>
+
+            <Link
+              href="/profile?tab=payment"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 transition"
+            >
+              <span className="text-lg">💳</span>
+              <span>Payout Methods</span>
+            </Link>
+
+            <Link
+              href="/profile"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 transition"
+            >
+              <span className="text-lg">⚙️</span>
+              <span>Edit Profile</span>
+            </Link>
+          </nav>
+        </div>
+
+        {/* SIDEBAR FOOTER */}
+        <div className="pt-6 border-t border-slate-800/80 space-y-2 mt-6">
+          {isEligibleForBlink && (
+            <button
+              onClick={() => { setShowPkgModal(true); setIsMobileMenuOpen(false); }}
+              className="w-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-amber-300 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs shadow-lg shadow-purple-500/20 animate-pulse border border-amber-400/50 flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <span>👑</span> Upgrade Package
             </button>
+          )}
+
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-3.5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-2xl text-xs font-bold transition justify-center cursor-pointer"
+          >
+            <span>🚪</span> Logout
+          </button>
+        </div>
+      </aside>
+
+      {/* 🖥️ MAIN CONTENT AREA */}
+      <main className={`flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden ${isBanned ? 'pointer-events-none select-none filter blur-md' : ''}`}>
+        
+        {/* HEADER BAR */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
+          <div>
+            <h2 className="text-2xl font-black text-white">Reseller Control Dashboard</h2>
+            <p className="text-xs text-slate-400 mt-1">Track orders, monitor profits, request cancellations, and review payouts in real-time.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={fetchProfileAndOrders}
+              className="text-xs px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-bold transition flex items-center gap-1.5 cursor-pointer"
+            >
+              🔄 Sync Orders
+            </button>
+            <div className="text-xs font-mono bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl text-slate-300 font-semibold shadow-inner hidden sm:block">
+              {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
           </div>
         </div>
 
+        {/* ALERTS */}
         {profile && !profile?.payment_method && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 relative z-10">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-lg w-full">
+            <div className="flex items-center gap-3.5">
+              <span className="text-3xl">⚠️</span>
               <div>
                 <h4 className="text-sm font-bold text-amber-400">Payout Details Missing</h4>
-                <p className="text-xs text-slate-300">You haven't added your Bank or Mobile Banking (bKash/Nagad) details yet. Please update to receive payouts.</p>
+                <p className="text-xs text-slate-300 mt-0.5">You haven't added your Bank or Mobile Banking (bKash/Nagad) details yet. Please update to receive payouts.</p>
               </div>
             </div>
-            <Link href="/profile?tab=payment" className="bg-amber-500 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl shrink-0">
+            <Link href="/profile?tab=payment" className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-5 py-2.5 rounded-xl shrink-0 transition">
               Add Payout Details
             </Link>
           </div>
         )}
 
         {holdOrders.length > 0 && (
-          <div className="bg-rose-950/40 border border-rose-800/60 rounded-2xl p-5 mb-8 space-y-3 relative z-10">
+          <div className="bg-rose-950/40 border border-rose-800/60 rounded-3xl p-6 mb-8 space-y-3 shadow-lg w-full">
             <h3 className="text-sm font-bold text-rose-400 flex items-center gap-2">
               🛑 Payment Hold Alert ({holdOrders.length} Order{holdOrders.length > 1 ? 's' : ''})
             </h3>
             <p className="text-xs text-slate-300">The admin placed a hold on your payout for the following reason(s):</p>
-            <div className="space-y-2">
+            <div className="space-y-2.5 pt-1">
               {holdOrders.map(o => (
-                <div key={o.id} className="bg-slate-900/80 border border-rose-900/50 p-3 rounded-xl flex justify-between items-center text-xs">
+                <div key={o.id} className="bg-slate-900/80 border border-rose-900/50 p-3.5 rounded-2xl flex justify-between items-center text-xs">
                   <div>
                     <span className="font-mono text-slate-400">Order #{o.id.substring(0, 8)}:</span>
                     <span className="ml-2 font-semibold text-rose-300">"{o.payout_hold_reason || 'Information needs verification'}"</span>
@@ -380,70 +463,65 @@ export default function ResellerDashboard() {
           </div>
         )}
 
-        {/* Metrics Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-6 mb-8 relative z-10">
-          <div className="p-6 rounded-3xl bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 shadow-xl">
+        {/* METRICS CARDS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 w-full">
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending Orders</p>
-            <h3 className="text-3xl font-extrabold text-white mt-2">{stats.pending}</h3>
+            <h3 className="text-3xl sm:text-4xl font-black text-white mt-2">{stats.pending}</h3>
           </div>
-          <div className="p-6 rounded-3xl bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 shadow-xl">
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">In Transit / Shipped</p>
-            <h3 className="text-3xl font-extrabold text-white mt-2">{stats.shipped}</h3>
+            <h3 className="text-3xl sm:text-4xl font-black text-white mt-2">{stats.shipped}</h3>
           </div>
-          <div className="p-6 rounded-3xl bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 shadow-xl">
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Profit Earned</p>
-            <h3 className="text-3xl font-extrabold text-emerald-400 mt-2">৳{stats.profit}</h3>
+            <h3 className="text-3xl sm:text-4xl font-black text-emerald-400 mt-2">৳{stats.profit}</h3>
           </div>
-          <div className="p-6 rounded-3xl bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 shadow-xl">
+          <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Received Payout</p>
-            <h3 className="text-3xl font-extrabold text-teal-400 mt-2">৳{stats.totalPaid}</h3>
+            <h3 className="text-3xl sm:text-4xl font-black text-teal-400 mt-2">৳{stats.totalPaid}</h3>
           </div>
         </div>
 
-        {/* Orders Stream Table */}
-        <div className="relative z-10 bg-slate-900/60 backdrop-blur-xl border border-slate-800/80 rounded-3xl shadow-2xl overflow-hidden">
+        {/* ORDERS STREAM TABLE */}
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl shadow-xl overflow-hidden w-full">
           <div className="p-6 border-b border-slate-800/80 flex justify-between items-center">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-100">Live Orders Stream</h2>
-            <button 
-              onClick={fetchProfileAndOrders}
-              className="text-xs px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 font-bold transition flex items-center gap-1.5"
-            >
-              🔄 Sync Orders
-            </button>
+            <h2 className="text-lg sm:text-xl font-bold text-white">Live Orders Stream</h2>
+            <span className="text-xs text-slate-400 font-semibold">{orders.length} Total Record(s)</span>
           </div>
 
-          {/* Mobile View */}
-          <div className="block sm:hidden p-4 space-y-3">
+          {/* Mobile Card View */}
+          <div className="block lg:hidden p-4 space-y-4">
             {orders.length === 0 ? (
-              <p className="text-center text-slate-500 py-6 text-xs">No orders placed yet.</p>
+              <p className="text-center text-slate-500 py-8 text-xs font-medium">No orders placed yet.</p>
             ) : (
               orders.map((o) => (
                 <div key={o.id} className="p-4 rounded-2xl bg-slate-800/40 border border-slate-800 space-y-3">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-bold text-white text-base">{o.customer_name}</h4>
-                      <p className="text-xs text-slate-400">{o.customer_phone}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{o.customer_phone}</p>
                     </div>
                     <button 
                       onClick={() => setSelectedOrder(o)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold cursor-pointer"
                     >
                       📍 Track
                     </button>
                   </div>
 
                   {o.decline_note && (
-                    <p className="text-[11px] bg-rose-500/10 text-rose-400 border border-rose-500/30 p-2 rounded-xl">
+                    <p className="text-xs bg-rose-500/10 text-rose-400 border border-rose-500/30 p-2.5 rounded-xl">
                       ⚠️ Cancel Declined: {o.decline_note}
                     </p>
                   )}
 
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-800/60 text-xs">
-                    <span className="text-slate-400">Profit: <strong className="text-emerald-400">৳{o.profit_amount || 0}</strong></span>
+                  <div className="flex justify-between items-center pt-3 border-t border-slate-800/60 text-xs">
+                    <span className="text-slate-400">Profit: <strong className="text-emerald-400 text-sm">৳{o.profit_amount || 0}</strong></span>
                     {o.status === 'pending' && (
                       <button 
                         onClick={() => setCancellingOrder(o)} 
-                        className="px-3 py-1 bg-rose-500/20 text-rose-400 rounded-lg text-xs font-bold"
+                        className="px-3.5 py-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
                       >
                         ❌ Cancel Request
                       </button>
@@ -455,10 +533,10 @@ export default function ResellerDashboard() {
           </div>
 
           {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
+          <div className="hidden lg:block overflow-x-auto w-full">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase font-semibold border-b border-slate-800">
+                <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
                   <th className="p-5">Customer</th>
                   <th className="p-5">Phone</th>
                   <th className="p-5">Your Profit</th>
@@ -470,25 +548,25 @@ export default function ResellerDashboard() {
               <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500 text-xs">
+                    <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
                       No orders placed yet.
                     </td>
                   </tr>
                 ) : (
                   orders.map((o) => (
-                    <tr key={o.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={o.id} className="hover:bg-slate-800/30 transition">
                       <td className="p-5 font-semibold text-white">
                         {o.customer_name}
                         {o.decline_note && (
-                          <div className="text-[11px] text-rose-400 font-normal mt-0.5">
+                          <div className="text-xs text-rose-400 font-normal mt-1">
                             ⚠️ Cancel Declined: {o.decline_note}
                           </div>
                         )}
                       </td>
-                      <td className="p-5 text-slate-400">{o.customer_phone}</td>
-                      <td className="p-5 font-bold text-emerald-400">+ ৳{o.profit_amount || 0}</td>
+                      <td className="p-5 text-slate-400 font-mono">{o.customer_phone}</td>
+                      <td className="p-5 font-bold text-emerald-400 text-base">+ ৳{o.profit_amount || 0}</td>
                       <td className="p-5">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border capitalize ${
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border capitalize ${
                           o.status === 'cancel_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
                           o.status === 'cancelled' ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' :
                           'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
@@ -497,21 +575,21 @@ export default function ResellerDashboard() {
                         </span>
                       </td>
                       <td className="p-5">
-                        {o.payout_status === 'paid' && <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full text-xs font-bold">🟢 Paid</span>}
-                        {o.payout_status === 'hold' && <span className="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2.5 py-1 rounded-full text-xs font-bold">🔴 Hold</span>}
-                        {(!o.payout_status || o.payout_status === 'pending') && <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-1 rounded-full text-xs font-bold">🟡 Pending</span>}
+                        {o.payout_status === 'paid' && <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-bold">🟢 Paid</span>}
+                        {o.payout_status === 'hold' && <span className="bg-rose-500/10 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-full text-xs font-bold">🔴 Hold</span>}
+                        {(!o.payout_status || o.payout_status === 'pending') && <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold">🟡 Pending</span>}
                       </td>
                       <td className="p-5 text-right space-x-2">
                         <button 
                           onClick={() => setSelectedOrder(o)}
-                          className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-semibold transition"
+                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold transition cursor-pointer"
                         >
                           📍 Track
                         </button>
                         {o.status === 'pending' && (
                           <button 
                             onClick={() => setCancellingOrder(o)}
-                            className="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition"
+                            className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer"
                           >
                             ❌ Cancel Request
                           </button>
@@ -524,7 +602,8 @@ export default function ResellerDashboard() {
             </table>
           </div>
         </div>
-      </div>
+
+      </main>
 
       {/* 🔴 CANCEL REQUEST REASON MODAL */}
       <AnimatePresence>
@@ -538,38 +617,38 @@ export default function ResellerDashboard() {
             >
               <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 className="text-lg font-bold text-white">Request Order Cancellation</h3>
-                <button onClick={() => setCancellingOrder(null)} className="text-slate-400 hover:text-white font-bold">✕</button>
+                <button onClick={() => setCancellingOrder(null)} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
               </div>
 
               <p className="text-xs text-slate-300">
                 Customer: <strong className="text-white">{cancellingOrder.customer_name}</strong> ({cancellingOrder.customer_phone})
               </p>
 
-              <form onSubmit={handleSendCancelRequest} className="space-y-3">
+              <form onSubmit={handleSendCancelRequest} className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Reason for Cancellation *</label>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Reason for Cancellation *</label>
                   <textarea 
                     required
                     rows={3}
                     placeholder="e.g. Customer changed mind, wrong address, etc."
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-rose-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-rose-500"
                     value={cancelReason}
                     onChange={(e) => setCancelReason(e.target.value)}
                   />
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2.5 pt-2">
                   <button 
                     type="button" 
                     onClick={() => setCancellingOrder(null)}
-                    className="w-1/2 bg-slate-800 text-slate-300 py-2.5 rounded-xl text-xs font-bold"
+                    className="w-1/2 bg-slate-800 text-slate-300 py-3 rounded-xl text-xs font-bold cursor-pointer"
                   >
                     Close
                   </button>
                   <button 
                     type="submit" 
                     disabled={cancelLoading}
-                    className="w-1/2 bg-rose-600 hover:bg-rose-500 text-white py-2.5 rounded-xl text-xs font-bold transition"
+                    className="w-1/2 bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl text-xs font-bold transition cursor-pointer"
                   >
                     {cancelLoading ? 'Sending...' : 'Submit Request'}
                   </button>
@@ -597,7 +676,7 @@ export default function ResellerDashboard() {
                 </div>
                 <button 
                   onClick={() => setSelectedOrder(null)}
-                  className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700"
+                  className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -605,7 +684,7 @@ export default function ResellerDashboard() {
 
               {/* TIMELINE GRAPHIC */}
               <div className="py-6">
-                <h4 className="text-sm font-semibold text-slate-400 mb-8 uppercase tracking-wider text-center sm:text-left">Timeline Status</h4>
+                <h4 className="text-xs font-bold text-slate-400 mb-8 uppercase tracking-wider text-center sm:text-left">Timeline Status</h4>
 
                 <div className="flex flex-col sm:flex-row justify-between items-center gap-6 relative">
                   <div className="hidden sm:block absolute top-12 left-8 right-8 h-1 bg-slate-800 z-0">
@@ -673,7 +752,7 @@ export default function ResellerDashboard() {
               <div className="mt-6 flex justify-end">
                 <button 
                   onClick={() => setSelectedOrder(null)}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold px-6 py-2.5 rounded-xl border border-slate-700 text-xs"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-6 py-2.5 rounded-xl border border-slate-700 text-xs cursor-pointer"
                 >
                   Close Progress Window
                 </button>
@@ -693,7 +772,7 @@ export default function ResellerDashboard() {
                   <h3 className="text-xl font-extrabold text-white flex items-center gap-2">👑 Membership Packages</h3>
                   <p className="text-xs text-slate-400 mt-1">Upgrade your plan to unlock higher wholesale discounts and perks.</p>
                 </div>
-                <button onClick={() => setShowPkgModal(false)} className="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+                <button onClick={() => setShowPkgModal(false)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -714,7 +793,7 @@ export default function ResellerDashboard() {
                         </div>
                       </div>
 
-                      <button onClick={() => alert(`Please contact admin to upgrade to ${pkg.name} Plan!`)} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition">
+                      <button onClick={() => alert(`Please contact admin to upgrade to ${pkg.name} Plan!`)} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer">
                         Choose {pkg.name}
                       </button>
                     </div>
