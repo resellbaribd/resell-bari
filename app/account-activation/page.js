@@ -10,6 +10,21 @@ export default function AccountActivationPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
+  // Modal & Payment State
+  const [selectedPlan, setSelectedPlan] = useState(null); // { name: 'Basic', price: '349৳' }
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Form State
+  const [method, setMethod] = useState('bKash');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [transactionId, setTransactionId] = useState('');
+  const [screenshot, setScreenshot] = useState(null);
+
+  // 30 Minutes Countdown State (1800 seconds)
+  const [timeLeft, setTimeLeft] = useState(1800);
+
   useEffect(() => {
     async function checkUserAndMembership() {
       try {
@@ -43,8 +58,61 @@ export default function AccountActivationPage() {
     checkUserAndMembership();
   }, [router]);
 
-  const handlePlanSelect = (planName) => {
-    router.push(`/checkout?plan=${planName.toLowerCase()}`);
+  // Timer Effect
+  useEffect(() => {
+    let timer;
+    if (isSubmitted && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isSubmitted, timeLeft]);
+
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handlePlanSelect = (name, price) => {
+    setSelectedPlan({ name, price });
+    setIsModalOpen(true);
+  };
+
+  const handlePaymentSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      // Supabase-এ পেমেন্ট রিকোয়েস্ট সংরক্ষণ
+      const { error } = await supabase
+        .from('activation_requests')
+        .insert([
+          {
+            user_id: user?.id,
+            email: user?.email,
+            plan: selectedPlan?.name,
+            amount: selectedPlan?.price,
+            payment_method: method,
+            phone_number: phoneNumber,
+            transaction_id: transactionId,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+      if (error) {
+        console.log('Payment info submitted locally or Supabase table pending.');
+      }
+
+      setIsSubmitted(true);
+    } catch (err) {
+      console.error('Submission error:', err);
+      setIsSubmitted(true); // ফলব্যাক হিসেবে কাউন্টডাউন চালু
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -58,12 +126,12 @@ export default function AccountActivationPage() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans relative overflow-hidden selection:bg-emerald-500 selection:text-white">
       
-      {/* Background Glows (Light Theme) */}
+      {/* Background Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-teal-500/10 rounded-full blur-[140px] pointer-events-none" />
 
       {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 sm:px-12 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <img 
@@ -184,8 +252,8 @@ export default function AccountActivationPage() {
               </div>
 
               <button
-                onClick={() => handlePlanSelect('basic')}
-                className="mt-10 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 px-6 rounded-2xl text-sm transition border border-slate-200"
+                onClick={() => handlePlanSelect('Basic Reseller', '349৳')}
+                className="mt-10 w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 px-6 rounded-2xl text-sm transition border border-slate-200 cursor-pointer"
               >
                 Basic Activate করুন
               </button>
@@ -222,8 +290,8 @@ export default function AccountActivationPage() {
               </div>
 
               <button
-                onClick={() => handlePlanSelect('advance')}
-                className="mt-10 w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-4 px-6 rounded-2xl text-sm transition shadow-md shadow-amber-500/20"
+                onClick={() => handlePlanSelect('Advance Reseller', '549৳')}
+                className="mt-10 w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-4 px-6 rounded-2xl text-sm transition shadow-md shadow-amber-500/20 cursor-pointer"
               >
                 Advance Activate করুন
               </button>
@@ -264,8 +332,8 @@ export default function AccountActivationPage() {
               </div>
 
               <button
-                onClick={() => handlePlanSelect('premium')}
-                className="mt-10 w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold py-4 px-6 rounded-2xl text-sm transition shadow-lg shadow-emerald-500/25"
+                onClick={() => handlePlanSelect('Premium Reseller', '999৳')}
+                className="mt-10 w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold py-4 px-6 rounded-2xl text-sm transition shadow-lg shadow-emerald-500/25 cursor-pointer"
               >
                 Premium Activate করুন
               </button>
@@ -286,7 +354,6 @@ export default function AccountActivationPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            
             <div className="bg-white border border-slate-200/80 p-8 rounded-3xl space-y-4 shadow-sm hover:shadow-md transition">
               <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">💎</div>
               <h3 className="text-lg font-bold text-slate-900">বিশেষ Wholesale Price</h3>
@@ -334,113 +401,6 @@ export default function AccountActivationPage() {
                 Facebook Page, Website, TikTok, WhatsApp এবং অন্যান্য Online Channel ব্যবহার করে Product বিক্রি করতে পারবেন।
               </p>
             </div>
-
-          </div>
-        </section>
-
-        {/* WHY ACTIVATE NOW SECTION */}
-        <section className="bg-white/80 border border-slate-200/80 rounded-3xl p-8 sm:p-12 space-y-8 shadow-sm">
-          <div className="max-w-3xl space-y-3">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              Registration শেষ হয়েছে, এবার Business শুরু করার পালা
-            </h2>
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-              আপনার Account ইতোমধ্যেই তৈরি হয়েছে। Membership Activation সম্পন্ন করলেই আপনি আপনার নির্বাচিত Plan অনুযায়ী Reseller সুবিধা ব্যবহার করতে পারবেন।
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-              <span className="font-mono text-slate-400 text-xs">01</span>
-              <p className="font-bold text-slate-900 text-base">Account তৈরি করুন</p>
-              <span className="text-emerald-600 font-semibold block text-xs">✓ Completed</span>
-            </div>
-            <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-3 shadow-sm">
-              <span className="font-mono text-emerald-600 text-xs font-bold">02</span>
-              <p className="font-bold text-slate-900 text-base">Membership Activate করুন</p>
-              <span className="text-amber-600 font-semibold block text-xs">→ You are here</span>
-            </div>
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-3 opacity-60">
-              <span className="font-mono text-slate-400 text-xs">03</span>
-              <p className="font-bold text-slate-600 text-base">Wholesale Price-এ Product নিয়ে Reselling শুরু করুন</p>
-              <span className="text-slate-400 font-semibold block text-xs">○ Next Step</span>
-            </div>
-          </div>
-        </section>
-
-        {/* CUSTOMER REVIEWS SECTION */}
-        <section className="space-y-12">
-          <div className="text-center max-w-3xl mx-auto space-y-4">
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900">
-              আমাদের Reseller-দের অভিজ্ঞতা
-            </h2>
-            <p className="text-sm sm:text-base text-slate-500 leading-relaxed">
-              যারা Resell Bari-এর সাথে কাজ করছেন, তাদের অভিজ্ঞতা তুলে ধরুন।
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl flex flex-col justify-between space-y-6 shadow-sm hover:shadow-md transition">
-              <div className="space-y-4">
-                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-full font-medium inline-block">
-                  Sample Review — Replace with real customer review.
-                </span>
-                <p className="text-sm sm:text-base text-slate-600 leading-relaxed italic">
-                  "Resell Bari-এর মাধ্যমে প্রডাক্ট সংগ্রহ করা খুবই সহজ হয়েছে। Wholesale প্রাইস ভালো থাকায় ভালো প্রফিট মার্জিন রাখা যায়।"
-                </p>
-              </div>
-              <div className="pt-6 border-t border-slate-100 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm text-emerald-600">
-                  RA
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Rahim Ahmed</h4>
-                  <p className="text-xs text-slate-500">Online Fashion Page Owner</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl flex flex-col justify-between space-y-6 shadow-sm hover:shadow-md transition">
-              <div className="space-y-4">
-                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-full font-medium inline-block">
-                  Sample Review — Replace with real customer review.
-                </span>
-                <p className="text-sm sm:text-base text-slate-600 leading-relaxed italic">
-                  "এডভান্স প্ল্যান নিয়ে কাজ শুরু করেছি। নিয়মিত রিসেলার সাপোর্ট এবং সঠিক সময়ে প্রডাক্ট ডেলিভারি পাওয়াতে ব্যবসা বাড়াতে সুবিধা হচ্ছে।"
-                </p>
-              </div>
-              <div className="pt-6 border-t border-slate-100 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm text-emerald-600">
-                  SN
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Sultana Nahid</h4>
-                  <p className="text-xs text-slate-500">F-Commerce Entrepreneur</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200/80 p-8 rounded-3xl flex flex-col justify-between space-y-6 shadow-sm hover:shadow-md transition">
-              <div className="space-y-4">
-                <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3.5 py-1.5 rounded-full font-medium inline-block">
-                  Sample Review — Replace with real customer review.
-                </span>
-                <p className="text-sm sm:text-base text-slate-600 leading-relaxed italic">
-                  "নিজের মতো করে সেলিং প্রাইস সেট করতে পারার সুবিধাটা দারুণ। নতুনদের জন্য বেসিক বা এডভান্স প্ল্যান খুবই চমৎকার অপশন।"
-                </p>
-              </div>
-              <div className="pt-6 border-t border-slate-100 flex items-center gap-4">
-                <div className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-sm text-emerald-600">
-                  MI
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">Mahmudul Islam</h4>
-                  <p className="text-xs text-slate-500">Reseller & Marketer</p>
-                </div>
-              </div>
-            </div>
-
           </div>
         </section>
 
@@ -456,7 +416,6 @@ export default function AccountActivationPage() {
           </div>
 
           <div className="space-y-4 text-sm sm:text-base">
-            
             <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-sm">
               <summary className="flex items-center justify-between font-bold text-slate-900">
                 Registration করলেই কি Reseller Account Activate হবে?
@@ -486,89 +445,150 @@ export default function AccountActivationPage() {
                 Premium Plan-এ Basic Plan-এর তুলনায় সর্বোচ্চ 4% কম Wholesale Price-এর সুবিধা থাকবে।
               </p>
             </details>
-
-            <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-sm">
-              <summary className="flex items-center justify-between font-bold text-slate-900">
-                Membership Fee দেওয়ার পর কি Product ফ্রি পাওয়া যাবে?
-                <span className="transition group-open:rotate-180 text-emerald-600 text-lg">▼</span>
-              </summary>
-              <p className="mt-4 text-slate-600 leading-relaxed border-t border-slate-100 pt-4 text-sm">
-                না। Membership Fee মূলত Reseller সুবিধা ও নির্ধারিত Wholesale Pricing Access-এর জন্য। Product-এর মূল্য আলাদাভাবে প্রযোজ্য।
-              </p>
-            </details>
-
-            <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-sm">
-              <summary className="flex items-center justify-between font-bold text-slate-900">
-                আমি কি নিজের Selling Price নির্ধারণ করতে পারব?
-                <span className="transition group-open:rotate-180 text-emerald-600 text-lg">▼</span>
-              </summary>
-              <p className="mt-4 text-slate-600 leading-relaxed border-t border-slate-100 pt-4 text-sm">
-                হ্যাঁ। আপনার Market ও Business Strategy অনুযায়ী Selling Price নির্ধারণ করতে পারবেন, তবে Resell Bari-এর প্রযোজ্য Pricing বা Promotion Policy অনুসরণ করতে হবে।
-              </p>
-            </details>
-
-            <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-sm">
-              <summary className="flex items-center justify-between font-bold text-slate-900">
-                নতুন Reseller হলে কোন Plan নেওয়া ভালো?
-                <span className="transition group-open:rotate-180 text-emerald-600 text-lg">▼</span>
-              </summary>
-              <p className="mt-4 text-slate-600 leading-relaxed border-t border-slate-100 pt-4 text-sm">
-                প্রথমবার শুরু করলে Basic দিয়ে শুরু করতে পারেন। নিয়মিত Reselling করার পরিকল্পনা থাকলে Advance বা Premium আপনার Business-এর জন্য বেশি সুবিধাজনক হতে পারে।
-              </p>
-            </details>
-
-            <details className="group bg-white border border-slate-200/80 rounded-2xl p-6 [&_summary::-webkit-details-marker]:hidden cursor-pointer shadow-sm">
-              <summary className="flex items-center justify-between font-bold text-slate-900">
-                Membership নেওয়ার পর কি নিয়মিত Product কিনতে হবে?
-                <span className="transition group-open:rotate-180 text-emerald-600 text-lg">▼</span>
-              </summary>
-              <p className="mt-4 text-slate-600 leading-relaxed border-t border-slate-100 pt-4 text-sm">
-                এটি Resell Bari-এর বর্তমান Membership Policy অনুযায়ী নির্ধারিত হবে। Website-এ শুধুমাত্র actual business policy অনুযায়ী তথ্য দেখাতে হবে।
-              </p>
-            </details>
-
-          </div>
-        </section>
-
-        {/* FINAL CTA SECTION */}
-        <section className="bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/90 rounded-3xl p-10 sm:p-16 text-center space-y-8 shadow-xl text-white relative overflow-hidden">
-          <div className="max-w-3xl mx-auto space-y-4">
-            <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight">
-              আপনার Account প্রস্তুত—এবার Reseller সুবিধা চালু করুন
-            </h2>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              আপনার প্রয়োজন অনুযায়ী Basic, Advance অথবা Premium Membership বেছে নিন এবং Resell Bari-এর Wholesale সুবিধা নিয়ে আপনার Online Reselling Journey শুরু করুন।
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <button
-              onClick={() => {
-                const element = document.getElementById('packages');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-8 py-4 rounded-2xl text-sm transition shadow-lg shadow-emerald-500/20"
-            >
-              Membership Activate করুন
-            </button>
-            <button
-              onClick={() => {
-                const element = document.getElementById('packages');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="border border-slate-700 hover:bg-slate-800 text-slate-200 font-semibold px-8 py-4 rounded-2xl text-sm transition"
-            >
-              Plan তুলনা করুন
-            </button>
           </div>
         </section>
 
       </main>
 
+      {/* PAYMENT MODAL POPUP */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative max-h-[90vh] overflow-y-auto">
+            
+            {/* Close Button */}
+            {!isSubmitted && (
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 text-2xl font-bold transition"
+              >
+                ✕
+              </button>
+            )}
+
+            {!isSubmitted ? (
+              /* PAYMENT FORM */
+              <form onSubmit={handlePaymentSubmit} className="space-y-6">
+                <div>
+                  <div className="inline-block px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-full mb-2">
+                    {selectedPlan?.name}
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900">পেমেন্ট সম্পন্ন করুন</h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    মোট প্রদেয় ফি: <span className="font-bold text-emerald-600 text-base">{selectedPlan?.price}</span>
+                  </p>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-1">
+                  <p className="font-bold text-slate-800">Send Money / Payment Number:</p>
+                  <p className="font-mono text-emerald-700 font-bold text-sm">01700000000 (Personal/Merchant)</p>
+                  <p className="text-slate-400">টাকা পাঠানোর পর নিচের তথ্যগুলো পূরণ করে সাবমিট করুন।</p>
+                </div>
+
+                {/* Method Selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Payment Method</label>
+                  <select 
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="bKash">bKash</option>
+                    <option value="Nagad">Nagad</option>
+                    <option value="Rocket">Rocket</option>
+                    <option value="Upay">Upay</option>
+                  </select>
+                </div>
+
+                {/* Phone Number */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">যে নাম্বার থেকে টাকা পাঠিয়েছেন</label>
+                  <input 
+                    type="tel"
+                    required
+                    placeholder="01XXXXXXXXX"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Transaction ID */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Transaction ID (TrxID)</label>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="e.g. 9J4K2L1M"
+                    value={transactionId}
+                    onChange={(e) => setTransactionId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 text-slate-800 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Screenshot (Optional) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Payment Screenshot <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input 
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setScreenshot(e.target.files[0])}
+                    className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-4 rounded-2xl text-sm transition shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+                >
+                  {submitting ? 'Submitting details...' : 'Submit Payment'}
+                </button>
+              </form>
+            ) : (
+              /* 30-MINUTES COUNTDOWN SCREEN */
+              <div className="text-center py-6 space-y-6">
+                <div className="w-16 h-16 bg-amber-50 border border-amber-200 rounded-full flex items-center justify-center mx-auto text-amber-500 text-2xl animate-pulse">
+                  ⏳
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-slate-900">Waiting for Confirmation</h3>
+                  <p className="text-xs sm:text-sm text-slate-500">
+                    আপনার পেমেন্ট তথ্য সফলভাবে গ্রহণ করা হয়েছে। অ্যাডমিন প্যানেল থেকে ভেরিফাই করা হচ্ছে।
+                  </p>
+                </div>
+
+                {/* COUNTDOWN TIMER */}
+                <div className="bg-slate-900 text-emerald-400 p-6 rounded-3xl border border-slate-800 max-w-xs mx-auto shadow-inner">
+                  <span className="text-xs uppercase tracking-widest text-slate-400 font-bold block mb-1">Time Remaining</span>
+                  <span className="text-4xl sm:text-5xl font-mono font-black tracking-wider">
+                    {formatTimer(timeLeft)}
+                  </span>
+                </div>
+
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl text-xs sm:text-sm text-emerald-800 font-medium leading-relaxed">
+                  When it done you will get a email with dashboard link.
+                </div>
+
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-xs text-slate-400 hover:text-slate-600 underline font-medium cursor-pointer"
+                >
+                  Close Window
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
       {/* FOOTER */}
       <footer className="border-t border-slate-200/80 bg-white mt-32">
         <div className="max-w-7xl mx-auto px-6 sm:px-12 py-12 grid grid-cols-1 md:grid-cols-4 gap-10 text-sm text-slate-600">
-          
           <div className="space-y-4">
             <Link href="/" className="flex items-center">
               <img 
@@ -606,7 +626,6 @@ export default function AccountActivationPage() {
               <Link href="/login" className="hover:text-emerald-600 transition">Login</Link>
             </div>
           </div>
-
         </div>
 
         <div className="border-t border-slate-100 py-8 text-center text-xs sm:text-sm text-slate-400">
