@@ -21,6 +21,7 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [packages, setPackages] = useState([]);
   const [profiles, setProfiles] = useState([]);
+  const [activationRequests, setActivationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -60,11 +61,16 @@ export default function AdminDashboard() {
   const [banForm, setBanForm] = useState({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' });
   const [isBanning, setIsBanning] = useState(false);
 
+  // 💳 Payment Request Filter & Action Loading
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [paymentActionLoading, setPaymentActionLoading] = useState(null);
+
   useEffect(() => {
     fetchAdminData();
     const channel = supabase.channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { fetchAdminData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { fetchAdminData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activation_requests' }, () => { fetchAdminData(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
@@ -84,6 +90,15 @@ export default function AdminDashboard() {
 
       const { data: productData } = await supabase.from('products').select('*').order('created_at', { ascending: false });
       const { data: pkgData } = await supabase.from('packages').select('*').order('price', { ascending: true });
+
+      // Fetch Activation Requests
+      const { data: requestData, error: reqErr } = await supabase
+        .from('activation_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (reqErr) console.error('Activation Requests Fetch Error:', reqErr.message);
+      if (requestData) setActivationRequests(requestData);
 
       if (orderData) {
         const mappedOrders = orderData.map(o => {
@@ -112,6 +127,59 @@ export default function AdminDashboard() {
       console.error('Data Fetch Error:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // 💳 Payment Request Actions
+  async function handleApprovePayment(request) {
+    if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
+    setPaymentActionLoading(request.id);
+    try {
+      const { error: reqErr } = await supabase
+        .from('activation_requests')
+        .update({ status: 'approved' })
+        .eq('id', request.id);
+
+      if (reqErr) throw reqErr;
+
+      // Update User Plan in Profiles table
+      if (request.user_id) {
+        const cleanPlan = request.plan?.toLowerCase()?.replace(' reseller', '') || 'basic';
+        await supabase
+          .from('profiles')
+          .update({
+            plan: cleanPlan,
+            status: 'active'
+          })
+          .eq('id', request.user_id);
+      }
+
+      alert('Payment confirmed and user plan activated successfully!');
+      fetchAdminData();
+    } catch (err) {
+      alert('Error approving payment: ' + err.message);
+    } finally {
+      setPaymentActionLoading(null);
+    }
+  }
+
+  async function handleDeclinePayment(request) {
+    if (!confirm(`Are you sure you want to decline this payment (TrxID: ${request.transaction_id})?`)) return;
+    setPaymentActionLoading(request.id);
+    try {
+      const { error } = await supabase
+        .from('activation_requests')
+        .update({ status: 'declined' })
+        .eq('id', request.id);
+
+      if (error) throw error;
+
+      alert('Payment request has been declined.');
+      fetchAdminData();
+    } catch (err) {
+      alert('Error declining payment: ' + err.message);
+    } finally {
+      setPaymentActionLoading(null);
     }
   }
 
@@ -594,10 +662,16 @@ export default function AdminDashboard() {
 
   const pendingOrders = orders.filter(o => o.status === 'pending');
   const cancelRequests = orders.filter(o => o.status === 'cancel_requested');
+  const pendingPayments = activationRequests.filter(r => r.status === 'pending');
   const deliveredOrders = orders.filter(o => o.status === 'delivered');
   const deliveredSalesValue = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
   const totalResellerProfit = deliveredOrders.reduce((sum, o) => sum + Number(o.profit_amount || 0), 0);
   const lowStockProducts = products.filter(p => (p.stock || 0) <= 5);
+
+  const filteredActivationRequests = activationRequests.filter(r => {
+    if (paymentFilter === 'all') return true;
+    return r.status === paymentFilter;
+  });
 
   const getSellersList = () => {
     const sellerMap = {};
@@ -676,7 +750,7 @@ export default function AdminDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
             ⚡ Enterprise Admin Control Hub
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Order lifecycles, analytics, low stock alerts, packages, and reseller management.</p>
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">Order lifecycles, analytics, low stock alerts, packages, payments, and reseller management.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
@@ -695,7 +769,7 @@ export default function AdminDashboard() {
           </button>
 
           <div className="grid grid-cols-3 sm:flex bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800/80 gap-1.5 w-full sm:w-auto">
-            {['overview', 'orders', 'resellers', 'inventory', 'packages'].map(tab => (
+            {['overview', 'orders', 'resellers', 'payments', 'inventory', 'packages'].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -703,7 +777,11 @@ export default function AdminDashboard() {
                   activeTab === tab ? 'bg-emerald-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white bg-slate-900/50 sm:bg-transparent'
                 }`}
               >
-                <span>{tab === 'resellers' ? '👥 Resellers' : tab === 'packages' ? '📦 Packages' : tab}</span>
+                <span>
+                  {tab === 'resellers' ? '👥 Resellers' : 
+                   tab === 'payments' ? `💳 Payments${pendingPayments.length > 0 ? ` (${pendingPayments.length})` : ''}` : 
+                   tab === 'packages' ? '📦 Packages' : tab}
+                </span>
               </button>
             ))}
           </div>
@@ -712,6 +790,24 @@ export default function AdminDashboard() {
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* 💳 PENDING PAYMENTS ALERT */}
+          {pendingPayments.length > 0 && (
+            <div className="bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-teal-500/5 border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-pulse">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <span className="text-2xl sm:text-4xl bg-emerald-500/20 p-2.5 sm:p-3 rounded-2xl border border-emerald-500/40">💳</span>
+                <div>
+                  <h3 className="text-base sm:text-xl font-extrabold text-emerald-400 tracking-wide">
+                    {pendingPayments.length} RESELLER MEMBERSHIP PAYMENT{pendingPayments.length > 1 ? 'S' : ''} PENDING!
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5">Resellers submitted payment details. Verify TrxID and activate accounts.</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveTab('payments')} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-5 py-3 rounded-xl transition shadow-lg shrink-0 text-center">
+                ⚡ Verify Payments ({pendingPayments.length})
+              </button>
+            </div>
+          )}
+
           {cancelRequests.length > 0 && (
             <div className="bg-gradient-to-r from-rose-500/20 via-rose-500/10 to-rose-500/5 border-2 border-rose-500/50 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-3">
               <div className="flex items-center gap-3">
@@ -828,6 +924,115 @@ export default function AdminDashboard() {
                 <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">No sales data available</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 💳 PAYMENT REQUESTS TAB */}
+      {activeTab === 'payments' && (
+        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-2">
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-white">💳 Membership Payment & Activation Requests</h2>
+              <p className="text-[11px] sm:text-xs text-slate-400">Verify user transaction IDs, confirm payments, or decline requests.</p>
+            </div>
+
+            <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800 gap-1">
+              {['all', 'pending', 'approved', 'declined'].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setPaymentFilter(tab)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold capitalize transition ${
+                    paymentFilter === tab
+                      ? 'bg-emerald-500 text-slate-950 font-bold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-800/40 text-slate-400 text-[11px] uppercase border-b border-slate-800">
+                  <th className="p-3">User / Email</th>
+                  <th className="p-3">Plan</th>
+                  <th className="p-3">Method</th>
+                  <th className="p-3">Sender Phone</th>
+                  <th className="p-3">TrxID</th>
+                  <th className="p-3">Amount</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
+                {filteredActivationRequests.length === 0 ? (
+                  <tr><td colSpan={8} className="p-6 text-center text-slate-500">No payment requests found.</td></tr>
+                ) : (
+                  filteredActivationRequests.map((req) => (
+                    <tr key={req.id} className="hover:bg-slate-800/20">
+                      <td className="p-3">
+                        <div className="font-bold text-white">{req.email || 'N/A'}</div>
+                        <div className="text-[10px] text-slate-500">{new Date(req.created_at).toLocaleString()}</div>
+                      </td>
+                      <td className="p-3">
+                        <span className="px-2.5 py-1 bg-slate-800 text-emerald-400 rounded-lg text-[10px] font-bold uppercase">
+                          {req.plan}
+                        </span>
+                      </td>
+                      <td className="p-3 font-bold text-amber-400">{req.payment_method}</td>
+                      <td className="p-3 font-mono font-semibold">{req.phone_number}</td>
+                      <td className="p-3 font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2 rounded">
+                        {req.transaction_id}
+                      </td>
+                      <td className="p-3 font-bold text-white">{req.amount}</td>
+                      <td className="p-3">
+                        {req.status === 'pending' && (
+                          <span className="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-[10px] font-bold">
+                            ● Pending
+                          </span>
+                        )}
+                        {req.status === 'approved' && (
+                          <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-[10px] font-bold">
+                            ✓ Approved
+                          </span>
+                        )}
+                        {req.status === 'declined' && (
+                          <span className="px-2.5 py-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-full text-[10px] font-bold">
+                            ✕ Declined
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-right">
+                        {req.status === 'pending' ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleApprovePayment(req)}
+                              disabled={paymentActionLoading === req.id}
+                              className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => handleDeclinePayment(req)}
+                              disabled={paymentActionLoading === req.id}
+                              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-slate-500 text-xs italic">Completed</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
