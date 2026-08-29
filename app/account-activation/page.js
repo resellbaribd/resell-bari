@@ -65,15 +65,12 @@ export default function AccountActivationPage() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 sm:px-12 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center">
             <img 
-              src="/logo.svg" 
+              src="/icon.svg" 
               alt="Resell Bari" 
-              className="h-10 w-auto object-contain rounded-xl"
+              className="h-10 sm:h-12 w-auto object-contain"
             />
-            <span className="text-xl font-black tracking-wider bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              RESELL BARI
-            </span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <Link href="/" className="hover:text-emerald-600 transition">Home</Link>
@@ -573,14 +570,13 @@ export default function AccountActivationPage() {
         <div className="max-w-7xl mx-auto px-6 sm:px-12 py-12 grid grid-cols-1 md:grid-cols-4 gap-10 text-sm text-slate-600">
           
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center">
               <img 
-                src="/logo.svg" 
+                src="/icon.svg" 
                 alt="Resell Bari" 
-                className="h-8 w-auto object-contain rounded-lg"
+                className="h-9 w-auto object-contain"
               />
-              <span className="text-base font-black text-slate-900 tracking-wider">RESELL BARI</span>
-            </div>
+            </Link>
             <p className="leading-relaxed text-xs sm:text-sm text-slate-500">
               বাংলাদেশের আধুনিক অনলাইন রিসেলিং প্ল্যাটফর্ম। Wholesale মূল্যে পণ্য সংগ্রহ করে আপনার নিজস্ব অনলাইন ব্যবসা পরিচালনা করুন।
             </p>
