@@ -23,9 +23,16 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // 8 Divisional Districts in Bengali as requested
   const districts = [
-    'Dhaka', 'Chittagong', 'Sylhet', 'Rajshahi', 'Khulna', 
-    'Barisal', 'Rangpur', 'Mymensingh', 'Jessore', 'Comilla', 'Cox\'s Bazar'
+    'ঢাকা',
+    'চট্টগ্রাম',
+    'রাজশাহী',
+    'খুলনা',
+    'বরিশাল',
+    'রংপুর',
+    'ময়মনসিংহ',
+    'সিলেট'
   ];
 
   const handleChange = (e) => {
@@ -49,7 +56,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // 1. Sign up with Supabase Auth
+      // 1. Sign up user via Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -60,7 +67,7 @@ export default function RegisterPage() {
       const userId = authData.user?.id;
 
       if (userId) {
-        // 2. Insert extra details into profiles table
+        // 2. Insert all registration details into the 'profiles' table linked to user id
         const { error: profileError } = await supabase.from('profiles').upsert([
           {
             id: userId,
@@ -196,7 +203,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* District */}
+            {/* District (8 Divisions) */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 District <span className="text-emerald-400">*</span>
@@ -208,7 +215,7 @@ export default function RegisterPage() {
                 value={formData.district}
                 onChange={handleChange}
               >
-                <option value="" disabled>Select district</option>
+                <option value="" disabled>Select one</option>
                 {districts.map((dist) => (
                   <option key={dist} value={dist}>{dist}</option>
                 ))}
