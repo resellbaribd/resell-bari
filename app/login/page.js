@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successModal, setSuccessModal] = useState({ show: false, targetUrl: '' });
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -28,13 +29,13 @@ export default function LoginPage() {
 
       const user = data.user;
 
-      // Check if user is Admin
+      // ১. Check if user is Admin
       if (email === 'sujanmiah.info@gmail.com' || user?.email === 'sujanmiah.info@gmail.com') {
-        router.push('/admin');
+        setSuccessModal({ show: true, targetUrl: '/admin' });
         return;
       }
 
-      // Check if user is banned
+      // ২. Check if user is banned
       const { data: profileData } = await supabase
         .from('profiles')
         .select('is_banned, ban_reason')
@@ -46,24 +47,33 @@ export default function LoginPage() {
         throw new Error(`Your account has been banned. Reason: ${profileData.ban_reason || 'Violation of terms'}`);
       }
 
-      router.push('/reseller');
+      // ৩. Reseller Login Success
+      setSuccessModal({ show: true, targetUrl: '/reseller' });
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleContinue = () => {
+    const destination = successModal.targetUrl || '/reseller';
+    setSuccessModal({ show: false, targetUrl: '' });
+    router.push(destination);
+  };
+
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans relative">
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-10 w-full max-w-lg shadow-2xl relative z-10 my-6">
         
-        {/* LOGO & HEADER */}
+        {/* LOGO (Clickable to Homepage) & HEADER */}
         <div className="text-center space-y-3 mb-8">
           <div className="flex justify-center">
-            <img src="/logo.svg" alt="Resell Bari" className="h-12 w-auto object-contain" />
+            <Link href="/" className="inline-block transition-transform hover:scale-105">
+              <img src="/logo.svg" alt="Resell Bari" className="h-12 w-auto object-contain cursor-pointer" />
+            </Link>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
             🔐 Welcome Back
@@ -73,6 +83,7 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* ERROR MESSAGE (NO BROWSER ALERT) */}
         {errorMsg && (
           <div className="mb-6 bg-rose-500/10 border border-rose-500/40 text-rose-400 p-3.5 rounded-2xl text-xs font-bold text-center">
             ⚠️ {errorMsg}
@@ -137,6 +148,38 @@ export default function LoginPage() {
         </div>
 
       </div>
+
+      {/* 🎉 CUSTOM SUCCESS MODAL (IN-APP) 🎉 */}
+      {successModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5">
+            
+            <div className="w-16 h-16 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-3xl shadow-lg shadow-emerald-500/30">
+              ✓
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl sm:text-2xl font-black text-white">
+                Login Successful!
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Welcome back to <span className="text-emerald-400 font-bold">Resell Bari</span>. Redirecting to your dashboard...
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleContinue}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-3.5 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer"
+              >
+                Go to Dashboard 🚀
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
