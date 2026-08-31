@@ -14,40 +14,54 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successModal, setSuccessModal] = useState({ show: false, targetUrl: '' });
 
+  // অ্যাডমিন ইমেইলগুলোর লিস্ট (ছোট হাতের অক্ষরে)
+  const ADMIN_EMAILS = [
+    'sujanmiah.info@gmail.com',
+    'info.resellbari@gmail.com',
+  ];
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setLoading(true);
 
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: cleanEmail,
+        password: password,
       });
 
       if (error) throw error;
 
       const user = data.user;
+      const userEmail = (user?.email || cleanEmail).toLowerCase();
 
-      // ১. Check if user is Admin
-      if (email === 'sujanmiah.info@gmail.com' || user?.email === 'sujanmiah.info@gmail.com') {
+      // ১. ইমেইল দিয়ে অ্যাডমিন চেক
+      if (ADMIN_EMAILS.includes(userEmail)) {
         setSuccessModal({ show: true, targetUrl: '/admin' });
         return;
       }
 
-      // ২. Check if user is banned
+      // ২. প্রোফাইল থেকে role এবং ban স্ট্যাটাস চেক
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('is_banned, ban_reason')
+        .select('role, is_banned, ban_reason')
         .eq('id', user.id)
         .single();
+
+      if (profileData?.role === 'admin') {
+        setSuccessModal({ show: true, targetUrl: '/admin' });
+        return;
+      }
 
       if (profileData?.is_banned) {
         await supabase.auth.signOut();
         throw new Error(`Your account has been banned. Reason: ${profileData.ban_reason || 'Violation of terms'}`);
       }
 
-      // ৩. Reseller Login Success
+      // ৩. সাধারণ রিসেলার ইউজার
       setSuccessModal({ show: true, targetUrl: '/reseller' });
     } catch (err) {
       setErrorMsg(err.message || 'Login failed. Please check your credentials.');
@@ -68,7 +82,7 @@ export default function LoginPage() {
 
       <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-10 w-full max-w-lg shadow-2xl relative z-10 my-6">
         
-        {/* LOGO (Clickable to Homepage) & HEADER */}
+        {/* LOGO & HEADER */}
         <div className="text-center space-y-3 mb-8">
           <div className="flex justify-center">
             <Link href="/" className="inline-block transition-transform hover:scale-105">
@@ -83,7 +97,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* ERROR MESSAGE (NO BROWSER ALERT) */}
+        {/* ERROR MESSAGE */}
         {errorMsg && (
           <div className="mb-6 bg-rose-500/10 border border-rose-500/40 text-rose-400 p-3.5 rounded-2xl text-xs font-bold text-center">
             ⚠️ {errorMsg}
@@ -149,7 +163,7 @@ export default function LoginPage() {
 
       </div>
 
-      {/* 🎉 CUSTOM SUCCESS MODAL (IN-APP) 🎉 */}
+      {/* SUCCESS MODAL */}
       {successModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5">
@@ -163,7 +177,7 @@ export default function LoginPage() {
                 Login Successful!
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Welcome back to <span className="text-emerald-400 font-bold">Resell Bari</span>. Redirecting to your dashboard...
+                Welcome back to <span className="text-emerald-400 font-bold">Resell Bari</span>. Redirecting to your panel...
               </p>
             </div>
 
@@ -172,7 +186,7 @@ export default function LoginPage() {
                 onClick={handleContinue}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-3.5 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer"
               >
-                Go to Dashboard 🚀
+                Go to Panel 🚀
               </button>
             </div>
 
