@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // ৮টি বিভাগ
   const districts = [
@@ -80,7 +81,7 @@ export default function RegisterPage() {
             full_name: formData.fullName,
             email: formData.email,
             phone: formData.phone,
-            shop_name: formData.facebookPage, // Facebook Page Link
+            shop_name: formData.facebookPage,
             website: formData.website || null,
             address: formData.address || null,
             district: formData.district || null,
@@ -93,8 +94,8 @@ export default function RegisterPage() {
         if (profileError) throw profileError;
       }
 
-      alert('Registration successful! Welcome to Resell Bari.');
-      router.push('/reseller');
+      // ব্রাউজার অ্যালার্টের পরিবর্তে কাস্টম পপ-আপ ওপেন হবে
+      setShowSuccessModal(true);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -102,16 +103,23 @@ export default function RegisterPage() {
     }
   };
 
+  const handleModalOk = () => {
+    setShowSuccessModal(false);
+    router.push('/login');
+  };
+
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans relative">
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-10 w-full max-w-2xl shadow-2xl relative z-10 my-6">
         
-        {/* LOGO & HEADER */}
+        {/* LOGO (Links to Homepage) & HEADER */}
         <div className="text-center space-y-3 mb-8">
           <div className="flex justify-center">
-            <img src="/logo.svg" alt="Resell Bari" className="h-12 w-auto object-contain" />
+            <Link href="/" className="inline-block transition-transform hover:scale-105">
+              <img src="/logo.svg" alt="Resell Bari" className="h-12 w-auto object-contain cursor-pointer" />
+            </Link>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
             🚀 Create Reseller Account
@@ -312,6 +320,39 @@ export default function RegisterPage() {
         </div>
 
       </div>
+
+      {/* 🎉 CUSTOM SUCCESS POPUP MODAL 🎉 */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5 transform transition-all scale-100">
+            
+            {/* Green Tick Animation Icon */}
+            <div className="w-16 h-16 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-3xl shadow-lg shadow-emerald-500/30">
+              ✓
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl sm:text-2xl font-black text-white">
+                Registration Successful!
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Welcome to <span className="text-emerald-400 font-bold">Resell Bari</span>. Your reseller account has been created successfully.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleModalOk}
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-3.5 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer"
+              >
+                Continue to Login 🚀
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
