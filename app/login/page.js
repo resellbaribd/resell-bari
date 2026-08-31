@@ -14,8 +14,10 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successModal, setSuccessModal] = useState({ show: false, targetUrl: '' });
 
-  // অ্যাডমিন ইমেইলগুলোর লিস্ট (ছোট হাতের অক্ষরে)
+  // অ্যাডমিন ইমেইল তালিকা (admin@resellbari.com সহ)
   const ADMIN_EMAILS = [
+    'admin@resellbari.com',
+    'admin@bbc.com',
     'sujanmiah.info@gmail.com',
     'info.resellbari@gmail.com',
   ];
@@ -33,32 +35,34 @@ export default function LoginPage() {
         password: password,
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Invalid login credentials');
+      }
 
       const user = data.user;
       const userEmail = (user?.email || cleanEmail).toLowerCase();
 
-      // ১. ইমেইল দিয়ে অ্যাডমিন চেক
+      // ১. ইমেইল তালিকা থেকে অ্যাডমিন চেক
       if (ADMIN_EMAILS.includes(userEmail)) {
         setSuccessModal({ show: true, targetUrl: '/admin' });
         return;
       }
 
-      // ২. প্রোফাইল থেকে role এবং ban স্ট্যাটাস চেক
+      // ২. প্রোফাইল থেকে role ও ban স্ট্যাটাস চেক (maybeSingle ব্যবহার করা হয়েছে যাতে এরর না দেয়)
       const { data: profileData } = await supabase
         .from('profiles')
         .select('role, is_banned, ban_reason')
         .eq('id', user.id)
-        .single();
-
-      if (profileData?.role === 'admin') {
-        setSuccessModal({ show: true, targetUrl: '/admin' });
-        return;
-      }
+        .maybeSingle();
 
       if (profileData?.is_banned) {
         await supabase.auth.signOut();
         throw new Error(`Your account has been banned. Reason: ${profileData.ban_reason || 'Violation of terms'}`);
+      }
+
+      if (profileData?.role?.toLowerCase() === 'admin') {
+        setSuccessModal({ show: true, targetUrl: '/admin' });
+        return;
       }
 
       // ৩. সাধারণ রিসেলার ইউজার
@@ -73,7 +77,7 @@ export default function LoginPage() {
   const handleContinue = () => {
     const destination = successModal.targetUrl || '/reseller';
     setSuccessModal({ show: false, targetUrl: '' });
-    router.push(destination);
+    window.location.href = destination;
   };
 
   return (
@@ -114,7 +118,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
-              placeholder="user@gmail.com"
+              placeholder="admin@resellbari.com"
               className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -177,7 +181,9 @@ export default function LoginPage() {
                 Login Successful!
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Welcome back to <span className="text-emerald-400 font-bold">Resell Bari</span>. Redirecting to your panel...
+                {successModal.targetUrl === '/admin'
+                  ? 'Welcome Admin! Redirecting to Control Hub...'
+                  : 'Welcome to Resell Bari! Redirecting to Dashboard...'}
               </p>
             </div>
 
@@ -186,7 +192,7 @@ export default function LoginPage() {
                 onClick={handleContinue}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-3.5 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer"
               >
-                Go to Panel 🚀
+                {successModal.targetUrl === '/admin' ? 'Go to Admin Panel 🛡️' : 'Go to Dashboard 🚀'}
               </button>
             </div>
 
