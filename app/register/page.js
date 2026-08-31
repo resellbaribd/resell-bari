@@ -11,7 +11,8 @@ export default function RegisterPage() {
     fullName: '',
     email: '',
     phone: '',
-    shopOrLink: '',
+    facebookPage: '',
+    website: '',
     address: '',
     district: '',
     password: '',
@@ -23,7 +24,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // 8 Divisional Districts in Bengali as requested
+  // ৮টি বিভাগ
   const districts = [
     'ঢাকা',
     'চট্টগ্রাম',
@@ -32,7 +33,7 @@ export default function RegisterPage() {
     'বরিশাল',
     'রংপুর',
     'ময়মনসিংহ',
-    'সিলেট'
+    'সিলেট',
   ];
 
   const handleChange = (e) => {
@@ -53,10 +54,15 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!formData.facebookPage.trim()) {
+      setErrorMsg('Facebook Page Link is required.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 1. Sign up user via Supabase Auth
+      // ১. Supabase Auth-এ সাইন-আপ
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -67,14 +73,15 @@ export default function RegisterPage() {
       const userId = authData.user?.id;
 
       if (userId) {
-        // 2. Insert all registration details into the 'profiles' table linked to user id
+        // ২. profiles টেবিলে ডাটা সংরক্ষণ
         const { error: profileError } = await supabase.from('profiles').upsert([
           {
             id: userId,
             full_name: formData.fullName,
             email: formData.email,
             phone: formData.phone,
-            shop_name: formData.shopOrLink || null,
+            shop_name: formData.facebookPage, // Facebook Page Link
+            website: formData.website || null,
             address: formData.address || null,
             district: formData.district || null,
             plan: 'basic',
@@ -98,7 +105,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex items-center justify-center p-4 sm:p-6 font-sans">
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
-      
+
       <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-10 w-full max-w-2xl shadow-2xl relative z-10 my-6">
         
         {/* LOGO & HEADER */}
@@ -123,7 +130,7 @@ export default function RegisterPage() {
         <form onSubmit={handleRegister} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {/* Full Name */}
+            {/* FULL NAME */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Full Name <span className="text-emerald-400">*</span>
@@ -139,7 +146,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Email Address */}
+            {/* EMAIL ADDRESS */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Email Address <span className="text-emerald-400">*</span>
@@ -155,7 +162,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Phone Number */}
+            {/* PHONE NUMBER */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Phone Number (11 Digits) <span className="text-emerald-400">*</span>
@@ -172,22 +179,38 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Facebook Page or Website Link (Optional) */}
+            {/* FACEBOOK PAGE LINK (REQUIRED) */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
-                Facebook Page / Website Link <span className="text-slate-400 text-[10px] lowercase font-normal">(optional)</span>
+                Facebook Page Link <span className="text-emerald-400">*</span>
               </label>
               <input
                 type="text"
-                name="shopOrLink"
-                placeholder="https://facebook.com/yourshop"
+                name="facebookPage"
+                required
+                placeholder="https://facebook.com/yourpage"
                 className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium"
-                value={formData.shopOrLink}
+                value={formData.facebookPage}
                 onChange={handleChange}
               />
             </div>
 
-            {/* Address */}
+            {/* WEBSITE LINK (OPTIONAL) */}
+            <div className="sm:col-span-2">
+              <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
+                Website Link <span className="text-slate-400 text-[10px] lowercase font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                name="website"
+                placeholder="https://yourwebsite.com"
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium"
+                value={formData.website}
+                onChange={handleChange}
+              />
+            </div>
+
+            {/* ADDRESS */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Address <span className="text-emerald-400">*</span>
@@ -203,7 +226,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* District (8 Divisions) */}
+            {/* DISTRICT (8 DIVISIONS) */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 District <span className="text-emerald-400">*</span>
@@ -222,7 +245,7 @@ export default function RegisterPage() {
               </select>
             </div>
 
-            {/* Password */}
+            {/* PASSWORD */}
             <div className="relative">
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Password <span className="text-emerald-400">*</span>
@@ -232,7 +255,7 @@ export default function RegisterPage() {
                 name="password"
                 required
                 placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium pr-12"
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium pr-14"
                 value={formData.password}
                 onChange={handleChange}
               />
@@ -245,7 +268,7 @@ export default function RegisterPage() {
               </button>
             </div>
 
-            {/* Confirm Password */}
+            {/* CONFIRM PASSWORD */}
             <div className="relative">
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Confirm Password <span className="text-emerald-400">*</span>
@@ -255,7 +278,7 @@ export default function RegisterPage() {
                 name="confirmPassword"
                 required
                 placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium pr-12"
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium pr-14"
                 value={formData.confirmPassword}
                 onChange={handleChange}
               />
@@ -270,7 +293,7 @@ export default function RegisterPage() {
 
           </div>
 
-          {/* Submit Button */}
+          {/* SUBMIT BUTTON */}
           <button
             type="submit"
             disabled={loading}
@@ -280,7 +303,7 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {/* Footer Login Link */}
+        {/* FOOTER LOGIN LINK */}
         <div className="text-center mt-6 text-xs sm:text-sm font-semibold text-slate-300">
           Already have an account?{' '}
           <Link href="/login" className="text-emerald-400 hover:underline font-bold">
