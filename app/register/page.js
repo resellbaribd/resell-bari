@@ -25,7 +25,6 @@ export default function RegisterPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // ৮টি বিভাগ
   const districts = [
     'ঢাকা',
     'চট্টগ্রাম',
@@ -50,7 +49,7 @@ export default function RegisterPage() {
       return;
     }
 
-    if (formData.phone.length < 11) {
+    if (formData.phone.trim().length < 11) {
       setErrorMsg('Please enter a valid 11-digit phone number.');
       return;
     }
@@ -63,10 +62,18 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const cleanEmail = formData.email.trim().toLowerCase();
+      const isAdmin = cleanEmail === 'admin@resellbari.com' || cleanEmail === 'admin@bbc.com' || cleanEmail === 'sujanmiah.info@gmail.com';
+
       // ১. Supabase Auth-এ সাইন-আপ
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
+        email: cleanEmail,
         password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+          },
+        },
       });
 
       if (authError) throw authError;
@@ -74,30 +81,30 @@ export default function RegisterPage() {
       const userId = authData.user?.id;
 
       if (userId) {
-        // ২. profiles টেবিলে ডাটা সংরক্ষণ
+        // ২. profiles টেবিলে ডাটা সংরক্ষণ (অ্যাডমিন ইমেইল হলে সরাসরি admin রোল পাবে)
         const { error: profileError } = await supabase.from('profiles').upsert([
           {
             id: userId,
             full_name: formData.fullName,
-            email: formData.email,
+            email: cleanEmail,
             phone: formData.phone,
             shop_name: formData.facebookPage,
             website: formData.website || null,
             address: formData.address || null,
             district: formData.district || null,
+            role: isAdmin ? 'admin' : 'reseller',
             plan: 'basic',
             status: 'active',
             created_at: new Date(),
           },
         ]);
 
-        if (profileError) throw profileError;
+        if (profileError) console.error('Profile insert warning:', profileError);
       }
 
-      // ব্রাউজার অ্যালার্টের পরিবর্তে কাস্টম পপ-আপ ওপেন হবে
       setShowSuccessModal(true);
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.message || err.error_description || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -114,7 +121,7 @@ export default function RegisterPage() {
 
       <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-2xl rounded-3xl p-6 sm:p-10 w-full max-w-2xl shadow-2xl relative z-10 my-6">
         
-        {/* LOGO (Links to Homepage) & HEADER */}
+        {/* LOGO & HEADER */}
         <div className="text-center space-y-3 mb-8">
           <div className="flex justify-center">
             <Link href="/" className="inline-block transition-transform hover:scale-105">
@@ -187,7 +194,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* FACEBOOK PAGE LINK (REQUIRED) */}
+            {/* FACEBOOK PAGE LINK */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Facebook Page Link <span className="text-emerald-400">*</span>
@@ -203,7 +210,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* WEBSITE LINK (OPTIONAL) */}
+            {/* WEBSITE LINK */}
             <div className="sm:col-span-2">
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 Website Link <span className="text-slate-400 text-[10px] lowercase font-normal">(optional)</span>
@@ -234,7 +241,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* DISTRICT (8 DIVISIONS) */}
+            {/* DISTRICT */}
             <div>
               <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
                 District <span className="text-emerald-400">*</span>
@@ -311,7 +318,7 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {/* FOOTER LOGIN LINK */}
+        {/* FOOTER */}
         <div className="text-center mt-6 text-xs sm:text-sm font-semibold text-slate-300">
           Already have an account?{' '}
           <Link href="/login" className="text-emerald-400 hover:underline font-bold">
@@ -321,25 +328,21 @@ export default function RegisterPage() {
 
       </div>
 
-      {/* 🎉 CUSTOM SUCCESS POPUP MODAL 🎉 */}
+      {/* MODAL */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5 transform transition-all scale-100">
-            
-            {/* Green Tick Animation Icon */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5">
             <div className="w-16 h-16 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-3xl shadow-lg shadow-emerald-500/30">
               ✓
             </div>
-
             <div className="space-y-2">
               <h3 className="text-xl sm:text-2xl font-black text-white">
                 Registration Successful!
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Welcome to <span className="text-emerald-400 font-bold">Resell Bari</span>. Your reseller account has been created successfully.
+                Welcome to <span className="text-emerald-400 font-bold">Resell Bari</span>. Your account is ready.
               </p>
             </div>
-
             <div className="pt-2">
               <button
                 onClick={handleModalOk}
@@ -348,7 +351,6 @@ export default function RegisterPage() {
                 Continue to Login 🚀
               </button>
             </div>
-
           </div>
         </div>
       )}
