@@ -1,11 +1,45 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 
-export const metadata = {
-  title: 'Resell Bari — Wholesale Price-এ Online Reselling Business শুরু করুন',
-  description: 'Resell Bari-এর সাথে Wholesale Price-এ পণ্য নিয়ে নিজের Online Reselling Business শুরু করুন। Basic, Advance ও Premium Membership থেকে আপনার জন্য উপযুক্ত Plan বেছে নিন।',
-};
-
 export default function HomePage() {
+  const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setProducts(data);
+        const uniqueCats = ['All', ...new Set(data.map((item) => item.category).filter(Boolean))];
+        setCategories(uniqueCats);
+      }
+    } catch (err) {
+      console.error('Error fetching products:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProducts = selectedCategory === 'All'
+    ? products
+    : products.filter((p) => p.category === selectedCategory);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans relative overflow-hidden selection:bg-emerald-500 selection:text-white">
       
@@ -30,8 +64,8 @@ export default function HomePage() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
             <Link href="#how-it-works" className="hover:text-emerald-600 transition">How It Works</Link>
             <Link href="#packages" className="hover:text-emerald-600 transition">Packages</Link>
-            <Link href="#comparison" className="hover:text-emerald-600 transition">Comparison</Link>
-            <Link href="#faq" className="hover:text-emerald-600 transition">FAQ</Link>
+            <Link href="#products" className="hover:text-emerald-600 transition">Products</Link>
+            <Link href="#why-choose" className="hover:text-emerald-600 transition">Why Us</Link>
           </nav>
 
           {/* Action Buttons (Mobile Optimized) */}
@@ -106,7 +140,7 @@ export default function HomePage() {
         </section>
 
         {/* WHY CHOOSE */}
-        <section className="space-y-12">
+        <section id="why-choose" className="space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900">কেন Resell Bari?</h2>
             <p className="text-sm sm:text-base text-slate-500">একটি সফল অনলাইন রিসেলিং ব্যবসা পরিচালনার জন্য প্রয়োজনীয় সকল সুযোগ-সুবিধা।</p>
@@ -294,6 +328,98 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* 🛍️ PRODUCTS SHOWCASE SECTION (PACKAGES ER NICHE) 🛍️ */}
+        <section id="products" className="space-y-12 scroll-mt-28">
+          <div className="text-center max-w-3xl mx-auto space-y-4">
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-4 py-1.5 rounded-full text-xs font-bold text-emerald-700 shadow-sm">
+              ✨ Top Trending Products
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900">
+              আমাদের প্রোডাক্ট কালেকশন
+            </h2>
+            <p className="text-sm sm:text-base text-slate-500">
+              ক্যাটাগরি অনুযায়ী ট্রেন্ডিং প্রোডাক্টগুলো দেখুন এবং রিসেলিং শুরু করতে রেজিস্টার করুন।
+            </p>
+          </div>
+
+          {/* CATEGORY FILTER BUTTONS */}
+          {categories.length > 0 && (
+            <div className="flex items-center justify-center gap-2 sm:gap-3 flex-wrap">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-5 py-2 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30 scale-105'
+                      : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 shadow-sm'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* PRODUCTS GRID */}
+          {loading ? (
+            <div className="text-center py-16 text-slate-400 text-sm font-semibold">
+              লোড হচ্ছে...
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-16 text-slate-400 text-sm font-semibold bg-white rounded-3xl border border-slate-200 shadow-sm">
+              এই ক্যাটাগরিতে বর্তমানে কোনো প্রোডাক্ট নেই।
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 sm:gap-8">
+              {filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="bg-white border border-slate-200/80 hover:border-emerald-300 rounded-3xl p-4 flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-lg hover:shadow-emerald-500/5 group"
+                >
+                  <div>
+                    {/* Product Image */}
+                    <div className="w-full h-48 sm:h-52 bg-slate-100 rounded-2xl overflow-hidden mb-4 border border-slate-100 flex items-center justify-center relative">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.title || product.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                      ) : (
+                        <span className="text-slate-400 text-xs font-semibold">No Image</span>
+                      )}
+                      {product.category && (
+                        <span className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-md border border-slate-200 text-slate-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs">
+                          {product.category}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Product Title */}
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 mb-3 line-clamp-2 leading-snug">
+                      {product.title || product.name}
+                    </h3>
+                  </div>
+
+                  {/* Details Call-to-Action & Register Button */}
+                  <div className="mt-2 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                    <p className="text-[11px] sm:text-xs text-slate-500 font-medium leading-relaxed text-center">
+                      প্রোডাক্টের বিস্তারিত ও হোলসেল রেট দেখতে রেজিস্টার করুন
+                    </p>
+                    <Link
+                      href="/register"
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs sm:text-sm text-center transition shadow-md shadow-emerald-500/20"
+                    >
+                      Register Now
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
       </main>
 
       {/* FOOTER */}
@@ -316,8 +442,9 @@ export default function HomePage() {
             <h4 className="text-slate-900 font-bold text-base">Quick Links</h4>
             <div className="flex flex-col space-y-2 text-xs sm:text-sm">
               <Link href="#packages" className="hover:text-emerald-600 transition">Packages</Link>
+              <Link href="#products" className="hover:text-emerald-600 transition">Products</Link>
               <Link href="#how-it-works" className="hover:text-emerald-600 transition">How It Works</Link>
-              <Link href="#faq" className="hover:text-emerald-600 transition">FAQ</Link>
+              <Link href="#why-choose" className="hover:text-emerald-600 transition">Why Us</Link>
             </div>
           </div>
 
