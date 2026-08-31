@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   ResponsiveContainer,
@@ -23,7 +23,7 @@ export default function AdminDashboard() {
   const [packages, setPackages] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [activationRequests, setActivationRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('confirmed');
@@ -33,7 +33,7 @@ export default function AdminDashboard() {
   const [uploading, setUploading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
 
-  // 🌟 New Product State with Category & Sub-Category
+  // 🌟 Product Form States
   const [newProduct, setNewProduct] = useState({ 
     title: '', 
     base_price: '', 
@@ -48,21 +48,24 @@ export default function AdminDashboard() {
   const [editMediaFiles, setEditMediaFiles] = useState([]);
   const [editUploading, setEditUploading] = useState(false);
 
+  // 💎 Package Form States
   const [pkgForm, setPkgForm] = useState({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
   const [editingPkg, setEditingPkg] = useState(null);
   const [savingPkg, setSavingPkg] = useState(false);
 
+  // ⚙️ Order Management States
   const [managingOrder, setManagingOrder] = useState(null);
   const [updateOrderLoading, setUpdateOrderLoading] = useState(false);
   const [declineNoteInput, setDeclineNoteInput] = useState('');
 
+  // 👥 Seller States
   const [selectedSeller, setSelectedSeller] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
   const [banForm, setBanForm] = useState({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' });
   const [isBanning, setIsBanning] = useState(false);
 
-  // 💳 Payment Request States & Decline Modal
+  // 💳 Payment Request States
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [paymentActionLoading, setPaymentActionLoading] = useState(null);
   const [decliningPaymentReq, setDecliningPaymentReq] = useState(null);
@@ -81,28 +84,30 @@ export default function AdminDashboard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // ⚡ ULTRA-FAST PARALLEL DATA FETCHING
   async function fetchAdminData() {
     setLoading(true);
     try {
-      const { data: profileData } = await supabase.from('profiles').select('*');
-      if (profileData) setProfiles(profileData);
-
-      const { data: orderData, error: orderErr } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [
+        { data: profileData },
+        { data: orderData, error: orderErr },
+        { data: productData },
+        { data: pkgData },
+        { data: requestData, error: reqErr }
+      ] = await Promise.all([
+        supabase.from('profiles').select('*'),
+        supabase.from('orders').select('*').order('created_at', { ascending: false }),
+        supabase.from('products').select('*').order('created_at', { ascending: false }),
+        supabase.from('packages').select('*').order('price', { ascending: true }),
+        supabase.from('activation_requests').select('*').order('created_at', { ascending: false })
+      ]);
 
       if (orderErr) console.error('Orders Fetch Error:', orderErr.message);
-
-      const { data: productData } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-      const { data: pkgData } = await supabase.from('packages').select('*').order('price', { ascending: true });
-
-      const { data: requestData, error: reqErr } = await supabase
-        .from('activation_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-
       if (reqErr) console.error('Activation Requests Fetch Error:', reqErr.message);
+
+      if (profileData) setProfiles(profileData);
+      if (productData) setProducts(productData);
+      if (pkgData) setPackages(pkgData);
       if (requestData) setActivationRequests(requestData);
 
       if (orderData) {
@@ -112,9 +117,9 @@ export default function AdminDashboard() {
           
           return {
             ...o,
-            product_name: matchedProduct?.name || o.product_name || 'General Product',
+            product_name: matchedProduct?.name || matchedProduct?.title || o.product_name || 'General Product',
             seller_id: matchedProfile?.id || o.reseller_id || o.user_id || 'unknown',
-            seller_name: matchedProfile?.full_name || o.seller_name || 'BBC',
+            seller_name: matchedProfile?.full_name || o.seller_name || 'Resell Bari Seller',
             seller_phone: matchedProfile?.phone || o.seller_phone || '',
             seller_logo: matchedProfile?.avatar_url || matchedProfile?.photo_url || matchedProfile?.logo_url || ''
           };
@@ -125,9 +130,6 @@ export default function AdminDashboard() {
         mappedOrders.forEach(o => { if (o.payout_hold_reason) initialHolds[o.id] = o.payout_hold_reason; });
         setHoldReasons(initialHolds);
       }
-
-      if (productData) setProducts(productData);
-      if (pkgData) setPackages(pkgData);
     } catch (err) {
       console.error('Data Fetch Error:', err);
     } finally {
@@ -135,7 +137,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // 💳 Payment Request Actions with Automatic Email Trigger
+  // 💳 Payment Request Actions
   async function handleApprovePayment(request) {
     if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
     setPaymentActionLoading(request.id);
@@ -147,7 +149,6 @@ export default function AdminDashboard() {
 
       if (reqErr) throw reqErr;
 
-      // Update User Plan in Profiles table
       if (request.user_id) {
         const cleanPlan = request.plan?.toLowerCase()?.replace(' reseller', '') || 'basic';
         await supabase
@@ -159,7 +160,6 @@ export default function AdminDashboard() {
           .eq('id', request.user_id);
       }
 
-      // ✉️ Send Approval & Congratulations Email
       if (request.email) {
         const emailBody = `
 Congratulations! Your Resell Bari Membership has been Activated!
@@ -169,8 +169,6 @@ Amount: ${request.amount}
 Transaction ID: ${request.transaction_id}
 
 Your reseller account is now fully active with special wholesale advantages.
-You can log in to your dashboard now using the link below:
-
 Dashboard Login: https://resellbari.com/login
 
 Thank you for choosing Resell Bari!
@@ -183,7 +181,7 @@ Thank you for choosing Resell Bari!
         });
       }
 
-      alert('Payment confirmed, account activated, and confirmation email sent to user!');
+      alert('Payment confirmed and account activated!');
       fetchAdminData();
     } catch (err) {
       alert('Error approving payment: ' + err.message);
@@ -202,30 +200,28 @@ Thank you for choosing Resell Bari!
       const { error } = await supabase
         .from('activation_requests')
         .update({ 
-          status: 'declined',
+          status: 'declined', 
           decline_reason: paymentDeclineReason 
         })
         .eq('id', request.id);
 
       if (error) throw error;
 
-      // ✉️ Send Decline Email with Issue Details
       if (request.email) {
         const declineBody = `
 Hello,
 
-Your membership activation payment request for the ${request.plan} plan has been declined by the administration.
+Your membership activation payment request for the ${request.plan} plan has been declined by administration.
 
 Details Submitted:
 - Method: ${request.payment_method}
-- Sender Phone: ${request.phone_number}
+- Sender Phone: ${request.phone_number || request.sender_number}
 - TrxID: ${request.transaction_id}
 
-Reason for Decline:
+Reason:
 "${paymentDeclineReason}"
 
-If this was a mistake or you entered the wrong Transaction ID, please log in and submit the correct payment details again or contact support.
-
+Please log in and submit the correct payment details again or contact support.
 Support & Login: https://resellbari.com/login
 
 Regards,
@@ -239,7 +235,7 @@ Resell Bari Team
         });
       }
 
-      alert('Payment declined and notification email sent to user.');
+      alert('Payment declined.');
       setDecliningPaymentReq(null);
       setPaymentDeclineReason('');
       fetchAdminData();
@@ -275,12 +271,6 @@ Resell Bari Team
     if (isEdit) setEditMediaFiles(files);
     else setMediaFiles(files);
   };
-
-  async function handleStatusChange(orderId, newStatus) {
-    const { error } = await supabase.from('orders').update({ status: newStatus, updated_at: new Date() }).eq('id', orderId);
-    if (!error) setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-    else alert('Error updating status: ' + error.message);
-  }
 
   async function handleBulkStatusChange() {
     if (selectedOrderIds.length === 0) return alert('Select at least one order!');
@@ -323,14 +313,12 @@ Resell Bari Team
     if (!confirm(`Are you sure you want to delete order for "${customerName || 'Customer'}"?`)) return;
 
     try {
-      const { data, error } = await supabase.from('orders').delete().eq('id', orderId).select();
+      const { error } = await supabase.from('orders').delete().eq('id', orderId);
       if (error) { alert('Delete Failed: ' + error.message); return; }
-      if (!data || data.length === 0) { alert('Warning: Database restricted deletion due to RLS policies.'); return; }
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
       setSelectedOrderIds(prev => prev.filter(id => id !== orderId));
-      alert('Order successfully deleted from database!');
-      fetchAdminData();
+      alert('Order successfully deleted!');
     } catch (err) {
       alert('Delete Error: ' + err.message);
     }
@@ -342,14 +330,12 @@ Resell Bari Team
 
     setBulkUpdating(true);
     try {
-      const { data, error } = await supabase.from('orders').delete().in('id', selectedOrderIds).select();
+      const { error } = await supabase.from('orders').delete().in('id', selectedOrderIds);
       if (error) { alert('Bulk Delete Failed: ' + error.message); setBulkUpdating(false); return; }
-      if (!data || data.length === 0) { alert('Warning: Database restricted bulk deletion.'); setBulkUpdating(false); return; }
 
       setOrders(prev => prev.filter(o => !selectedOrderIds.includes(o.id)));
       setSelectedOrderIds([]);
-      alert('Selected orders successfully deleted!');
-      fetchAdminData();
+      alert('Selected orders deleted!');
     } catch (err) {
       alert('Bulk Delete Error: ' + err.message);
     } finally {
@@ -511,7 +497,7 @@ Resell Bari Team
     else alert('Error: ' + error.message);
   }
 
-  // 🌟 Add Product with Category and Sub-Category
+  // 🌟 Add Product
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
@@ -551,7 +537,7 @@ Resell Bari Team
     else alert('Error: ' + error.message);
   }
 
-  // 🌟 Update Product with Category and Sub-Category
+  // 🌟 Update Product
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -707,7 +693,7 @@ Resell Bari Team
   }
 
   async function handleDeleteSellerProfile(sellerId, sellerName) {
-    if (!confirm(`⚠️ WARNING: Are you sure you want to PERMANENTLY delete seller "${sellerName}"? This action cannot be undone and will remove their profile data.`)) return;
+    if (!confirm(`⚠️ WARNING: Are you sure you want to PERMANENTLY delete seller "${sellerName}"? This action cannot be undone.`)) return;
     
     try {
       const { error } = await supabase
@@ -727,20 +713,21 @@ Resell Bari Team
     }
   }
 
-  const pendingOrders = orders.filter(o => o.status === 'pending');
-  const cancelRequests = orders.filter(o => o.status === 'cancel_requested');
-  const pendingPayments = activationRequests.filter(r => r.status === 'pending');
-  const deliveredOrders = orders.filter(o => o.status === 'delivered');
-  const deliveredSalesValue = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-  const totalResellerProfit = deliveredOrders.reduce((sum, o) => sum + Number(o.profit_amount || 0), 0);
-  const lowStockProducts = products.filter(p => (p.stock || 0) <= 5);
+  // 📈 Computed Quick Stats (useMemo for Performance)
+  const pendingOrders = useMemo(() => orders.filter(o => o.status === 'pending'), [orders]);
+  const cancelRequests = useMemo(() => orders.filter(o => o.status === 'cancel_requested'), [orders]);
+  const pendingPayments = useMemo(() => activationRequests.filter(r => r.status === 'pending'), [activationRequests]);
+  const deliveredOrders = useMemo(() => orders.filter(o => o.status === 'delivered'), [orders]);
+  const deliveredSalesValue = useMemo(() => deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0), [deliveredOrders]);
+  const totalResellerProfit = useMemo(() => deliveredOrders.reduce((sum, o) => sum + Number(o.profit_amount || 0), 0), [deliveredOrders]);
+  const lowStockProducts = useMemo(() => products.filter(p => (p.stock || 0) <= 5), [products]);
 
-  const filteredActivationRequests = activationRequests.filter(r => {
-    if (paymentFilter === 'all') return true;
-    return r.status === paymentFilter;
-  });
+  const filteredActivationRequests = useMemo(() => {
+    if (paymentFilter === 'all') return activationRequests;
+    return activationRequests.filter(r => r.status === paymentFilter);
+  }, [activationRequests, paymentFilter]);
 
-  const getSellersList = () => {
+  const sellersList = useMemo(() => {
     const sellerMap = {};
     profiles.forEach(p => {
       const walletMethod = p.payment_method || p.payment_option || 'bKash Personal';
@@ -788,11 +775,9 @@ Resell Bari Team
     });
 
     return Object.values(sellerMap);
-  };
+  }, [profiles, orders]);
 
-  const sellersList = getSellersList();
-
-  const getChartData = () => {
+  const chartData = useMemo(() => {
     const map = {};
     orders.forEach(o => {
       const date = new Date(o.created_at);
@@ -803,11 +788,7 @@ Resell Bari Team
     });
     const keys = Object.keys(map).slice(-10);
     return keys.map(k => ({ name: k, Sales: map[k] }));
-  };
-
-  const chartData = getChartData();
-
-  if (loading) return <div className="min-h-screen bg-[#0b0f19] text-slate-300 p-8 flex items-center justify-center font-sans">Loading Enterprise Control Hub...</div>;
+  }, [orders, chartFilter]);
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden">
@@ -839,7 +820,7 @@ Resell Bari Team
         )}
       </AnimatePresence>
 
-      {/* 🧭 PROFESSIONAL LEFT SIDEBAR NAVIGATION */}
+      {/* 🧭 PROFESSIONAL LEFT SIDEBAR */}
       <aside className={`
         fixed md:sticky top-0 left-0 z-50 h-screen overflow-y-auto
         w-72 bg-slate-900/95 border-r border-slate-800/80 p-6 flex flex-col justify-between shrink-0 backdrop-blur-2xl
@@ -925,13 +906,16 @@ Resell Bari Team
         </div>
       </aside>
 
-      {/* 🖥️ MAIN CONTENT AREA */}
+      {/* 🖥️ MAIN CONTENT */}
       <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden">
         
-        {/* HEADER BAR */}
+        {/* TOP STATUS BAR */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
           <div>
-            <h2 className="text-2xl font-black text-white capitalize">{activeTab} Control Center</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-black text-white capitalize">{activeTab} Control Center</h2>
+              {loading && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>}
+            </div>
             <p className="text-xs text-slate-400 mt-1">Manage lifecycles, analytics, packages, payments, and resellers in real-time.</p>
           </div>
           <div className="text-xs font-mono bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl text-slate-300 font-semibold shadow-inner">
@@ -967,7 +951,7 @@ Resell Bari Team
                     <h3 className="text-base sm:text-lg font-extrabold text-rose-400">
                       {cancelRequests.length} ORDER CANCELLATION REQUEST{cancelRequests.length > 1 ? 'S' : ''} PENDING!
                     </h3>
-                    <p className="text-xs text-slate-300 mt-0.5">Resellers have requested to cancel the following orders. Review reasons and approve or decline.</p>
+                    <p className="text-xs text-slate-300 mt-0.5">Resellers have requested to cancel the following orders.</p>
                   </div>
                 </div>
                 <div className="space-y-2.5 pt-2">
@@ -1135,7 +1119,7 @@ Resell Bari Team
                           </span>
                         </td>
                         <td className="p-4 font-bold text-amber-400 text-sm">{req.payment_method}</td>
-                        <td className="p-4 font-mono font-semibold text-slate-200">{req.phone_number}</td>
+                        <td className="p-4 font-mono font-semibold text-slate-200">{req.phone_number || req.sender_number}</td>
                         <td className="p-4 font-mono font-bold text-emerald-400 bg-emerald-500/5 px-2.5 py-1 rounded-md">
                           {req.transaction_id}
                         </td>
@@ -1577,7 +1561,7 @@ Resell Bari Team
                   <div className="flex items-center gap-4">
                     <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover shrink-0" alt={p.name} />
                     <div>
-                      <h4 className="font-bold text-white text-sm sm:text-base">{p.name}</h4>
+                      <h4 className="font-bold text-white text-sm sm:text-base">{p.name || p.title}</h4>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {p.category && (
                           <span className="text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg">
@@ -1590,7 +1574,7 @@ Resell Bari Team
                   </div>
                   <div className="flex items-center gap-2 w-full sm:w-auto">
                     <button onClick={() => setEditingProduct(p)} className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 transition cursor-pointer text-center">✏️ Edit</button>
-                    <button onClick={() => handleDeleteProduct(p.id, p.name)} className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition cursor-pointer text-center">🗑️</button>
+                    <button onClick={() => handleDeleteProduct(p.id, p.name || p.title)} className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-xs font-bold border border-rose-500/20 transition cursor-pointer text-center">🗑️</button>
                   </div>
                 </div>
               ))}
@@ -1759,7 +1743,7 @@ Resell Bari Team
 
       </main>
 
-      {/* 🔴 DECLINE PAYMENT WITH REASON MODAL */}
+      {/* 🔴 DECLINE PAYMENT MODAL */}
       <AnimatePresence>
         {decliningPaymentReq && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -1776,16 +1760,16 @@ Resell Bari Team
 
               <div className="text-xs text-slate-300 space-y-1 bg-slate-950 p-3 rounded-2xl border border-slate-800">
                 <p>User: <strong className="text-white">{decliningPaymentReq.email}</strong></p>
-                <p>TrxID: <strong className="text-emerald-400 font-mono">{decliningPaymentReq.transaction_id}</strong> | Phone: {decliningPaymentReq.phone_number}</p>
+                <p>TrxID: <strong className="text-emerald-400 font-mono">{decliningPaymentReq.transaction_id}</strong> | Phone: {decliningPaymentReq.phone_number || decliningPaymentReq.sender_number}</p>
               </div>
 
               <form onSubmit={handleConfirmDeclinePayment} className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Reason for Decline (Sent via email to User) *</label>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Reason for Decline (Sent via email) *</label>
                   <textarea 
                     required
                     rows={3}
-                    placeholder="e.g. Invalid Transaction ID, payment not received in bKash, etc."
+                    placeholder="e.g. Invalid Transaction ID, payment not received, etc."
                     className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-rose-500"
                     value={paymentDeclineReason}
                     onChange={(e) => setPaymentDeclineReason(e.target.value)}
@@ -1824,7 +1808,7 @@ Resell Bari Team
                   📊 Seller Dashboard: {selectedSeller.name}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
-                  Email: <span className="text-slate-200">{selectedSeller.email}</span> | Phone: {selectedSeller.phone || 'N/A'} | Wallet Details: <strong className="text-emerald-400 uppercase">{selectedSeller.payment_method}</strong>
+                  Email: <span className="text-slate-200">{selectedSeller.email}</span> | Phone: {selectedSeller.phone || 'N/A'} | Wallet: <strong className="text-emerald-400 uppercase">{selectedSeller.payment_method}</strong>
                   <button 
                     onClick={() => handleCopyWallet(selectedSeller.raw_bkash_number || selectedSeller.payment_method, selectedSeller.id)}
                     className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs px-3 py-1 rounded-lg text-emerald-400 font-bold transition cursor-pointer"
@@ -1905,7 +1889,7 @@ Resell Bari Team
               </div>
             </div>
 
-            {/* 🔴 DANGER ZONE */}
+            {/* DANGER ZONE */}
             <div className="mt-6 border-t border-rose-900/50 pt-6">
               <h4 className="text-sm font-bold text-rose-500 mb-4 flex items-center gap-2">⚠️ Danger Zone (Account Actions)</h4>
               
@@ -1953,7 +1937,7 @@ Resell Bari Team
         </div>
       )}
 
-      {/* 🔴 BAN SELLER MODAL FORM */}
+      {/* 🔴 BAN SELLER MODAL */}
       <AnimatePresence>
         {banForm.show && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
