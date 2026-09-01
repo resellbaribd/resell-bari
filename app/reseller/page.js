@@ -97,10 +97,18 @@ export default function ResellerDashboard() {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
+      // 🛡️ মেম্বারশিপ গেটকিপার গার্ড: প্ল্যান না থাকলে সোজা অ্যাক্টিভেশন পেজে রিডাইরেক্ট
       if (profileData) {
+        if (profileData.role !== 'admin' && (!profileData.plan || profileData.status !== 'active')) {
+          router.push('/activate');
+          return;
+        }
         setProfile(profileData);
+      } else {
+        router.push('/activate');
+        return;
       }
 
       const { data: ordersData } = await supabase
@@ -388,12 +396,12 @@ export default function ResellerDashboard() {
         {/* SIDEBAR FOOTER */}
         <div className="pt-6 border-t border-slate-800/80 space-y-2 mt-6">
           {isEligibleForBlink && (
-            <button
-              onClick={() => { setShowPkgModal(true); setIsMobileMenuOpen(false); }}
-              className="w-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-amber-300 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs shadow-lg shadow-purple-500/20 animate-pulse border border-amber-400/50 flex items-center justify-center gap-2 transition cursor-pointer"
+            <Link
+              href="/activate"
+              className="w-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-amber-300 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs shadow-lg shadow-purple-500/20 animate-pulse border border-amber-400/50 flex items-center justify-center gap-2 transition cursor-pointer text-center"
             >
               <span>👑</span> Upgrade Package
-            </button>
+            </Link>
           )}
 
           <button 
@@ -793,9 +801,12 @@ export default function ResellerDashboard() {
                         </div>
                       </div>
 
-                      <button onClick={() => alert(`Please contact admin to upgrade to ${pkg.name} Plan!`)} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer">
+                      <Link 
+                        href="/activate" 
+                        className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer text-center block"
+                      >
                         Choose {pkg.name}
-                      </button>
+                      </Link>
                     </div>
                   ))
                 )}
