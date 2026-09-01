@@ -14,7 +14,6 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successModal, setSuccessModal] = useState({ show: false, targetUrl: '' });
 
-  // অ্যাডমিন ইমেইল তালিকা
   const ADMIN_EMAILS = [
     'admin@resellbari.com',
     'admin@bbc.com',
@@ -65,9 +64,9 @@ export default function LoginPage() {
         return;
       }
 
-      // ৩. যদি ইউজারের কোনো মেম্বারশিপ প্ল্যান না থাকে বা পেন্ডিং থাকে -> সোজা /activate পেজে পাঠাবে
+      // ৩. যদি ইউজারের কোনো মেম্বারশিপ প্ল্যান না থাকে বা পেন্ডিং থাকে -> সোজা /account-activation পেজে পাঠাবে
       if (!profileData?.plan || profileData?.status !== 'active') {
-        setSuccessModal({ show: true, targetUrl: '/activate' });
+        setSuccessModal({ show: true, targetUrl: '/account-activation' });
         return;
       }
 
@@ -81,7 +80,7 @@ export default function LoginPage() {
   };
 
   const handleContinue = () => {
-    const destination = successModal.targetUrl || '/activate';
+    const destination = successModal.targetUrl || '/account-activation';
     setSuccessModal({ show: false, targetUrl: '' });
     window.location.href = destination;
   };
@@ -107,7 +106,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* ERROR MESSAGE */}
         {errorMsg && (
           <div className="mb-6 bg-rose-500/10 border border-rose-500/40 text-rose-400 p-3.5 rounded-2xl text-xs font-bold text-center">
             ⚠️ {errorMsg}
@@ -198,7 +196,7 @@ export default function LoginPage() {
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                 {successModal.targetUrl === '/admin'
                   ? 'Welcome Admin! Redirecting to Control Hub...'
-                  : successModal.targetUrl === '/activate'
+                  : successModal.targetUrl === '/account-activation'
                   ? 'Please activate your reseller membership to continue...'
                   : 'Welcome to Resell Bari! Redirecting to Dashboard...'}
               </p>

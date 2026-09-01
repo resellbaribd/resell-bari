@@ -99,15 +99,15 @@ export default function ResellerDashboard() {
         .eq('id', user.id)
         .maybeSingle();
 
-      // 🛡️ মেম্বারশিপ গেটকিপার গার্ড: প্ল্যান না থাকলে সোজা অ্যাক্টিভেশন পেজে রিডাইরেক্ট
+      // 🛡️ মেম্বারশিপ গেটকিপার গার্ড: প্ল্যান না থাকলে সোজা /account-activation পেজে রিডাইরেক্ট
       if (profileData) {
         if (profileData.role !== 'admin' && (!profileData.plan || profileData.status !== 'active')) {
-          router.push('/activate');
+          router.push('/account-activation');
           return;
         }
         setProfile(profileData);
       } else {
-        router.push('/activate');
+        router.push('/account-activation');
         return;
       }
 
@@ -311,7 +311,6 @@ export default function ResellerDashboard() {
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="space-y-6 relative">
-          {/* Mobile Close Button */}
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden absolute -top-2 -right-2 text-slate-400 hover:text-white p-2 cursor-pointer"
@@ -319,7 +318,6 @@ export default function ResellerDashboard() {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
 
-          {/* BRAND LOGO */}
           <div className="px-2 pt-1">
             <Link href="/" className="inline-block">
               <img 
@@ -334,7 +332,6 @@ export default function ResellerDashboard() {
             </div>
           </div>
 
-          {/* USER PROFILE MINI CARD */}
           <div className="bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl flex items-center gap-3">
             {loading ? (
               <div className="w-12 h-12 rounded-xl bg-slate-800 animate-pulse shrink-0" />
@@ -353,7 +350,6 @@ export default function ResellerDashboard() {
             </div>
           </div>
 
-          {/* NAVIGATION LINKS */}
           <nav className="space-y-1.5 pt-2">
             <Link
               href="/orders/new"
@@ -393,11 +389,10 @@ export default function ResellerDashboard() {
           </nav>
         </div>
 
-        {/* SIDEBAR FOOTER */}
         <div className="pt-6 border-t border-slate-800/80 space-y-2 mt-6">
           {isEligibleForBlink && (
             <Link
-              href="/activate"
+              href="/account-activation"
               className="w-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-amber-300 font-extrabold px-3.5 py-2.5 rounded-2xl text-xs shadow-lg shadow-purple-500/20 animate-pulse border border-amber-400/50 flex items-center justify-center gap-2 transition cursor-pointer text-center"
             >
               <span>👑</span> Upgrade Package
@@ -802,7 +797,7 @@ export default function ResellerDashboard() {
                       </div>
 
                       <Link 
-                        href="/activate" 
+                        href="/account-activation" 
                         className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs transition cursor-pointer text-center block"
                       >
                         Choose {pkg.name}

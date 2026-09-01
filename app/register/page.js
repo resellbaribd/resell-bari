@@ -113,7 +113,7 @@ export default function RegisterPage() {
 
   const handleModalOk = () => {
     setShowSuccessModal(false);
-    window.location.href = '/activate';
+    window.location.href = '/account-activation';
   };
 
   return (
