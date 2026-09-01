@@ -48,7 +48,7 @@ export default function LoginPage() {
         return;
       }
 
-      // ২. প্রোফাইল থেকে role ও ban স্ট্যাটাস চেক (maybeSingle ব্যবহার করা হয়েছে যাতে এরর না দেয়)
+      // ২. প্রোফাইল থেকে role ও ban স্ট্যাটাস চেক
       const { data: profileData } = await supabase
         .from('profiles')
         .select('role, is_banned, ban_reason')
@@ -101,7 +101,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* ERROR MESSAGE */}
         {errorMsg && (
           <div className="mb-6 bg-rose-500/10 border border-rose-500/40 text-rose-400 p-3.5 rounded-2xl text-xs font-bold text-center">
             ⚠️ {errorMsg}
@@ -118,7 +117,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
-              placeholder="admin@resellbari.com"
+              placeholder="user@gmail.com"
               className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -126,25 +125,36 @@ export default function LoginPage() {
           </div>
 
           {/* Password */}
-          <div className="relative">
-            <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
-              Password <span className="text-emerald-400">*</span>
-            </label>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              required
-              placeholder="••••••••"
-              className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium pr-14"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-10 text-slate-400 hover:text-white text-xs font-bold cursor-pointer"
-            >
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
+          <div>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">
+                Password <span className="text-emerald-400">*</span>
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-bold text-slate-400 hover:text-emerald-400 transition"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+            
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                placeholder="••••••••"
+                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium pr-14"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-3.5 text-slate-400 hover:text-white text-xs font-bold cursor-pointer"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
           {/* Submit Button */}
