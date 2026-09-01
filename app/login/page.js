@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successModal, setSuccessModal] = useState({ show: false, targetUrl: '' });
 
-  // অ্যাডমিন ইমেইল তালিকা (admin@resellbari.com সহ)
+  // অ্যাডমিন ইমেইল তালিকা
   const ADMIN_EMAILS = [
     'admin@resellbari.com',
     'admin@bbc.com',
@@ -48,10 +48,10 @@ export default function LoginPage() {
         return;
       }
 
-      // ২. প্রোফাইল থেকে role ও ban স্ট্যাটাস চেক
+      // ২. প্রোফাইল থেকে role, plan, status এবং ban স্ট্যাটাস চেক
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('role, is_banned, ban_reason')
+        .select('role, plan, status, is_banned, ban_reason')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -65,7 +65,13 @@ export default function LoginPage() {
         return;
       }
 
-      // ৩. সাধারণ রিসেলার ইউজার
+      // ৩. যদি ইউজারের কোনো মেম্বারশিপ প্ল্যান না থাকে বা পেন্ডিং থাকে -> সোজা /activate পেজে পাঠাবে
+      if (!profileData?.plan || profileData?.status !== 'active') {
+        setSuccessModal({ show: true, targetUrl: '/activate' });
+        return;
+      }
+
+      // ৪. অ্যাক্টিভ রিসেলার হলে ড্যাশবোর্ডে পাঠাবে
       setSuccessModal({ show: true, targetUrl: '/reseller' });
     } catch (err) {
       setErrorMsg(err.message || 'Login failed. Please check your credentials.');
@@ -75,7 +81,7 @@ export default function LoginPage() {
   };
 
   const handleContinue = () => {
-    const destination = successModal.targetUrl || '/reseller';
+    const destination = successModal.targetUrl || '/activate';
     setSuccessModal({ show: false, targetUrl: '' });
     window.location.href = destination;
   };
@@ -101,6 +107,7 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* ERROR MESSAGE */}
         {errorMsg && (
           <div className="mb-6 bg-rose-500/10 border border-rose-500/40 text-rose-400 p-3.5 rounded-2xl text-xs font-bold text-center">
             ⚠️ {errorMsg}
@@ -108,8 +115,7 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleLogin} className="space-y-5">
-          
-          {/* Email Address */}
+          {/* Email Input */}
           <div>
             <label className="text-xs font-extrabold text-slate-200 block mb-1.5 uppercase tracking-wider">
               Email Address <span className="text-emerald-400">*</span>
@@ -124,7 +130,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password */}
+          {/* Password Input with Forgot Link */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">
@@ -167,7 +173,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Footer Register Link */}
+        {/* Footer Link */}
         <div className="text-center mt-6 text-xs sm:text-sm font-semibold text-slate-300">
           Don't have an account?{' '}
           <Link href="/register" className="text-emerald-400 hover:underline font-bold">
@@ -181,7 +187,6 @@ export default function LoginPage() {
       {successModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5">
-            
             <div className="w-16 h-16 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-3xl shadow-lg shadow-emerald-500/30">
               ✓
             </div>
@@ -193,6 +198,8 @@ export default function LoginPage() {
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                 {successModal.targetUrl === '/admin'
                   ? 'Welcome Admin! Redirecting to Control Hub...'
+                  : successModal.targetUrl === '/activate'
+                  ? 'Please activate your reseller membership to continue...'
                   : 'Welcome to Resell Bari! Redirecting to Dashboard...'}
               </p>
             </div>
@@ -202,14 +209,12 @@ export default function LoginPage() {
                 onClick={handleContinue}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-3.5 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer"
               >
-                {successModal.targetUrl === '/admin' ? 'Go to Admin Panel 🛡️' : 'Go to Dashboard 🚀'}
+                Continue 🚀
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }
