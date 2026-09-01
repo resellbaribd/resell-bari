@@ -72,6 +72,7 @@ export default function RegisterPage() {
         options: {
           data: {
             full_name: formData.fullName,
+            phone: formData.phone,
           },
         },
       });
@@ -81,7 +82,7 @@ export default function RegisterPage() {
       const userId = authData.user?.id;
 
       if (userId) {
-        // ২. profiles টেবিলে ডাটা সংরক্ষণ (অ্যাডমিন ইমেইল হলে সরাসরি admin রোল পাবে)
+        // ২. profiles টেবিলে ডাটা সংরক্ষণ (রিসেলারের জন্য plan: null এবং status: 'pending' থাকবে)
         const { error: profileError } = await supabase.from('profiles').upsert([
           {
             id: userId,
@@ -93,8 +94,8 @@ export default function RegisterPage() {
             address: formData.address || null,
             district: formData.district || null,
             role: isAdmin ? 'admin' : 'reseller',
-            plan: 'basic',
-            status: 'active',
+            plan: isAdmin ? 'basic' : null,
+            status: isAdmin ? 'active' : 'pending',
             created_at: new Date(),
           },
         ]);
@@ -112,7 +113,7 @@ export default function RegisterPage() {
 
   const handleModalOk = () => {
     setShowSuccessModal(false);
-    router.push('/login');
+    window.location.href = '/activate';
   };
 
   return (
@@ -132,7 +133,7 @@ export default function RegisterPage() {
             🚀 Create Reseller Account
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-medium">
-            Join our network and start selling instantly with high profit margins.
+            Join our network, select a membership plan, and start selling.
           </p>
         </div>
 
@@ -154,7 +155,7 @@ export default function RegisterPage() {
                 type="text"
                 name="fullName"
                 required
-                placeholder="e.g. John Ibrahim Khan"
+                placeholder="e.g. Sujan Miah"
                 className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition shadow-inner font-medium"
                 value={formData.fullName}
                 onChange={handleChange}
@@ -314,7 +315,7 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full mt-6 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-4 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer disabled:opacity-50"
           >
-            {loading ? 'Creating Account...' : 'Register Account'}
+            {loading ? 'Creating Account...' : 'Continue to Membership 🚀'}
           </button>
         </form>
 
@@ -328,7 +329,7 @@ export default function RegisterPage() {
 
       </div>
 
-      {/* MODAL */}
+      {/* SUCCESS MODAL */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5">
@@ -340,7 +341,7 @@ export default function RegisterPage() {
                 Registration Successful!
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Welcome to <span className="text-emerald-400 font-bold">Resell Bari</span>. Your account is ready.
+                Welcome to <span className="text-emerald-400 font-bold">Resell Bari</span>. Please choose your membership plan to activate your dashboard.
               </p>
             </div>
             <div className="pt-2">
@@ -348,7 +349,7 @@ export default function RegisterPage() {
                 onClick={handleModalOk}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black py-3.5 rounded-2xl text-sm uppercase tracking-wider transition shadow-lg shadow-emerald-500/25 cursor-pointer"
               >
-                Continue to Login 🚀
+                Activate Membership Now 💎
               </button>
             </div>
           </div>
