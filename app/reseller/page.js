@@ -89,7 +89,7 @@ export default function ResellerDashboard() {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push('/login');
+        router.replace('/login');
         return;
       }
 
@@ -99,15 +99,23 @@ export default function ResellerDashboard() {
         .eq('id', user.id)
         .maybeSingle();
 
-      // 🛡️ মেম্বারশিপ গেটকিপার গার্ড: প্ল্যান না থাকলে সোজা /account-activation পেজে রিডাইরেক্ট
+      // 🛡️ STRICT MEMBERSHIP GATEKEEPER GUARD:
+      // অ্যাডমিন বাদে যেসকল ইউজারের ভ্যালিড প্ল্যান নেই অথবা স্ট্যাটাস active নয়, তাদের সরাসরি /account-activation এ পাঠানো হবে
       if (profileData) {
-        if (profileData.role !== 'admin' && (!profileData.plan || profileData.status !== 'active')) {
-          router.push('/account-activation');
+        const validPlans = ['basic', 'advance', 'premium'];
+        const userPlan = profileData?.plan ? profileData.plan.toLowerCase().trim() : null;
+        const hasValidPlan = userPlan && validPlans.includes(userPlan);
+        const isActive = profileData?.status === 'active';
+        const isAdmin = profileData?.role?.toLowerCase() === 'admin';
+
+        if (!isAdmin && (!hasValidPlan || !isActive)) {
+          router.replace('/account-activation');
           return;
         }
+
         setProfile(profileData);
       } else {
-        router.push('/account-activation');
+        router.replace('/account-activation');
         return;
       }
 
@@ -176,7 +184,7 @@ export default function ResellerDashboard() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push('/login');
+    router.replace('/login');
   }
 
   const holdOrders = orders.filter(o => o.payout_status === 'hold');
