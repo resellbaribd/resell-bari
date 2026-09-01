@@ -38,30 +38,38 @@ function Ticket({ children, className = "" }) {
 
 function PackageIllustration() {
   return (
-    <svg viewBox="0 0 380 340" className="w-full max-w-sm mx-auto" role="img" aria-label="Wholesale package illustration">
-      <rect x="40" y="150" width="130" height="110" rx="6" fill="#065f46" opacity="0.12" />
-      <rect x="40" y="150" width="130" height="110" rx="6" fill="none" stroke="#065f46" strokeWidth="2" />
-      <line x1="105" y1="150" x2="105" y2="260" stroke="#065f46" strokeWidth="2" />
-      <line x1="40" y1="200" x2="170" y2="200" stroke="#065f46" strokeWidth="2" opacity="0.4" />
+    <svg viewBox="0 0 420 300" className="w-full max-w-sm mx-auto" role="img" aria-label="Wholesale product resold through your own online shop for profit">
+      <line x1="20" y1="270" x2="400" y2="270" stroke="#a8a29e" strokeWidth="1.5" strokeDasharray="4 4" />
 
-      <rect x="180" y="110" width="150" height="150" rx="6" fill="#065f46" opacity="0.9" />
-      <line x1="255" y1="110" x2="255" y2="260" stroke="#f5f5f4" strokeWidth="2" opacity="0.5" />
-      <line x1="180" y1="185" x2="330" y2="185" stroke="#f5f5f4" strokeWidth="2" opacity="0.5" />
-
-      <rect x="150" y="60" width="90" height="70" rx="6" fill="#d97706" opacity="0.9" />
-      <line x1="195" y1="60" x2="195" y2="130" stroke="#fffbeb" strokeWidth="2" opacity="0.6" />
-
-      <g transform="translate(276 44) rotate(18)">
-        <path d="M0 10 Q0 0 10 0 H50 Q60 0 60 10 V38 Q60 48 50 48 H10 Q0 48 0 38 Z" fill="#fef3c7" stroke="#d97706" strokeWidth="2" />
-        <circle cx="16" cy="14" r="4" fill="none" stroke="#d97706" strokeWidth="2" />
-        <line x1="16" y1="18" x2="16" y2="40" stroke="#d97706" strokeWidth="1.5" strokeDasharray="2 3" />
-        <text x="30" y="30" fontSize="14" fontWeight="700" fill="#92400e" textAnchor="middle">৳</text>
+      {/* Wholesale box */}
+      <g>
+        <path d="M35 150 L100 118 L165 150 L165 245 L35 245 Z" fill="#f5f5f4" stroke="#065f46" strokeWidth="2.5" strokeLinejoin="round" />
+        <line x1="35" y1="150" x2="165" y2="150" stroke="#065f46" strokeWidth="2" />
+        <line x1="100" y1="150" x2="100" y2="245" stroke="#065f46" strokeWidth="2" opacity="0.5" />
+        <text x="100" y="270" fontSize="16" fontWeight="600" fill="#292524" textAnchor="middle">Wholesale পণ্য</text>
       </g>
 
-      <circle cx="330" cy="270" r="26" fill="none" stroke="#d97706" strokeWidth="2" strokeDasharray="3 3" />
-      <text x="330" y="275" fontSize="11" fill="#92400e" textAnchor="middle" fontWeight="600">Wholesale</text>
+      {/* arrow: wholesale -> your shop */}
+      <path d="M180 195 L228 195" stroke="#065f46" strokeWidth="2.5" strokeDasharray="5 5" fill="none" />
+      <path d="M222 187 L232 195 L222 203" stroke="#065f46" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
 
-      <line x1="40" y1="272" x2="330" y2="272" stroke="#a8a29e" strokeWidth="1.5" strokeDasharray="4 4" />
+      {/* Your shop (bag) */}
+      <g>
+        <path d="M255 165 L335 165 L345 245 Q345 251 339 251 H251 Q245 251 245 245 Z" fill="#065f46" />
+        <path d="M270 165 Q270 138 295 138 Q320 138 320 165" fill="none" stroke="#065f46" strokeWidth="3" />
+        <rect x="270" y="196" width="50" height="30" rx="5" fill="#fef3c7" stroke="#d97706" strokeWidth="2" />
+        <text x="295" y="217" fontSize="17" fontWeight="700" fill="#92400e" textAnchor="middle">৳</text>
+        <text x="295" y="270" fontSize="16" fontWeight="600" fill="#292524" textAnchor="middle">আপনার অনলাইন শপ</text>
+      </g>
+
+      {/* profit */}
+      <g>
+        <path d="M355 45 L365 33 L372 40 L390 20" stroke="#16a34a" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M382 20 L390 20 L390 28" stroke="#16a34a" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="378" cy="88" r="30" fill="#fef3c7" stroke="#d97706" strokeWidth="2" strokeDasharray="3 3" />
+        <text x="378" y="95" fontSize="20" fontWeight="700" fill="#92400e" textAnchor="middle">৳</text>
+        <text x="378" y="133" fontSize="13" fontWeight="600" fill="#57534e" textAnchor="middle">Profit</text>
+      </g>
     </svg>
   );
 }
@@ -523,7 +531,7 @@ export default function HomePage() {
                 ))
               : filteredProducts.map((p) => (
                   <div key={p.id} className="bg-white border border-stone-200 rounded-lg overflow-hidden flex flex-col">
-                    <div className="h-28 sm:h-32 bg-emerald-950/5 flex items-center justify-center overflow-hidden">
+                    <div className="aspect-square bg-emerald-950/5 flex items-center justify-center overflow-hidden">
                       {p.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={p.image_url} alt={p.title || p.name} className="w-full h-full object-cover" />
