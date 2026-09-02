@@ -64,13 +64,18 @@ export default function LoginPage() {
         return;
       }
 
-      // ৩. যদি ইউজারের কোনো মেম্বারশিপ প্ল্যান না থাকে বা পেন্ডিং থাকে -> সোজা /account-activation পেজে পাঠাবে
-      if (!profileData?.plan || profileData?.status !== 'active') {
+      // ৩. 🛡️ STRICT MEMBERSHIP CHECK: ভ্যালিড প্ল্যান ও একটিভ স্ট্যাটাস না থাকলে সরাসরি /account-activation এ পাঠাবে
+      const validPlans = ['basic', 'advance', 'premium'];
+      const userPlan = profileData?.plan ? profileData.plan.toLowerCase().trim() : null;
+      const hasValidPlan = userPlan && validPlans.includes(userPlan);
+      const isActive = profileData?.status === 'active';
+
+      if (!hasValidPlan || !isActive) {
         setSuccessModal({ show: true, targetUrl: '/account-activation' });
         return;
       }
 
-      // ৪. অ্যাক্টিভ রিসেলার হলে ড্যাশবোর্ডে পাঠাবে
+      // ৪. শুধুমাত্র ভেরিফাইড পেইড রিসেলার ড্যাশবোর্ডে ঢুকবে
       setSuccessModal({ show: true, targetUrl: '/reseller' });
     } catch (err) {
       setErrorMsg(err.message || 'Login failed. Please check your credentials.');
@@ -197,7 +202,7 @@ export default function LoginPage() {
                 {successModal.targetUrl === '/admin'
                   ? 'Welcome Admin! Redirecting to Control Hub...'
                   : successModal.targetUrl === '/account-activation'
-                  ? 'Please activate your reseller membership to continue...'
+                  ? 'Please activate your reseller membership to unlock dashboard...'
                   : 'Welcome to Resell Bari! Redirecting to Dashboard...'}
               </p>
             </div>
