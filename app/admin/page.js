@@ -235,29 +235,59 @@ export default function AdminDashboard() {
     }
   }
 
-  // Payment Actions
+  // 💳 Payment Actions (Updated with dual UID + Email profile update)
   async function handleApprovePayment(request) {
     if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
     setPaymentActionLoading(request.id);
+    
     try {
+      // ১. activation_requests টেবিল এপ্রুভ করা
       const { error: reqErr } = await supabase
         .from('activation_requests')
-        .update({ status: 'approved' })
+        .update({ status: 'approved', updated_at: new Date() })
         .eq('id', request.id);
 
       if (reqErr) throw reqErr;
 
+      // প্ল্যান স্যানিটাইজ করা ('Basic Reseller' -> 'basic')
+      const rawPlan = request.plan?.toLowerCase() || 'basic';
+      let cleanPlan = 'basic';
+      if (rawPlan.includes('advance')) cleanPlan = 'advance';
+      else if (rawPlan.includes('premium')) cleanPlan = 'premium';
+
+      // ২. profiles টেবিলে user_id অথবা email দিয়ে মেম্বারশিপ নিশ্চিত একটিভ করা
+      let profileUpdated = false;
+
       if (request.user_id) {
-        const cleanPlan = request.plan?.toLowerCase()?.replace(' reseller', '') || 'basic';
+        const { data: updatedByUid } = await supabase
+          .from('profiles')
+          .update({
+            plan: cleanPlan,
+            status: 'active',
+            updated_at: new Date()
+          })
+          .eq('id', request.user_id)
+          .select();
+        
+        if (updatedByUid && updatedByUid.length > 0) {
+          profileUpdated = true;
+        }
+      }
+
+      // যদি user_id না থাকে বা আপডেট না হয়, সরাসরি ইমেইল দিয়ে ব্যাকআপ আপডেট
+      if (!profileUpdated && request.email) {
+        const cleanEmail = request.email.trim().toLowerCase();
         await supabase
           .from('profiles')
           .update({
             plan: cleanPlan,
-            status: 'active'
+            status: 'active',
+            updated_at: new Date()
           })
-          .eq('id', request.user_id);
+          .eq('email', cleanEmail);
       }
 
+      // ৩. ইউজারকে ইমেইল নোটিফিকেশন পাঠানো
       if (request.email) {
         const emailBody = `
 Congratulations! Your Resell Bari Membership has been Activated!
@@ -274,7 +304,7 @@ Dashboard Login: https://resellbari.com/login
         });
       }
 
-      alert('Payment confirmed and account activated!');
+      alert('Payment confirmed & Profile activated successfully!');
       fetchAdminData();
     } catch (err) {
       alert('Error approving payment: ' + err.message);
