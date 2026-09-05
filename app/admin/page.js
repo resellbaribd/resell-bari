@@ -74,7 +74,7 @@ export default function AdminDashboard() {
   const [decliningPaymentReq, setDecliningPaymentReq] = useState(null);
   const [paymentDeclineReason, setPaymentDeclineReason] = useState('');
 
-  // 🛡️ Sub-Admin / Team Access Management
+  // Staff Management
   const [staffForm, setStaffForm] = useState({
     email: '',
     name: '',
@@ -84,7 +84,6 @@ export default function AdminDashboard() {
   const [creatingStaff, setCreatingStaff] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
 
-  // Mobile Menu
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const AVAILABLE_PERMISSIONS = [
@@ -235,13 +234,12 @@ export default function AdminDashboard() {
     }
   }
 
-  // 💳 Payment Actions (Updated with dual UID + Email profile update)
+  // 💳 Payment Actions (Dual UID + Email Sync)
   async function handleApprovePayment(request) {
     if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
     setPaymentActionLoading(request.id);
     
     try {
-      // ১. activation_requests টেবিল এপ্রুভ করা
       const { error: reqErr } = await supabase
         .from('activation_requests')
         .update({ status: 'approved', updated_at: new Date() })
@@ -249,13 +247,11 @@ export default function AdminDashboard() {
 
       if (reqErr) throw reqErr;
 
-      // প্ল্যান স্যানিটাইজ করা ('Basic Reseller' -> 'basic')
       const rawPlan = request.plan?.toLowerCase() || 'basic';
       let cleanPlan = 'basic';
       if (rawPlan.includes('advance')) cleanPlan = 'advance';
       else if (rawPlan.includes('premium')) cleanPlan = 'premium';
 
-      // ২. profiles টেবিলে user_id অথবা email দিয়ে মেম্বারশিপ নিশ্চিত একটিভ করা
       let profileUpdated = false;
 
       if (request.user_id) {
@@ -274,7 +270,6 @@ export default function AdminDashboard() {
         }
       }
 
-      // যদি user_id না থাকে বা আপডেট না হয়, সরাসরি ইমেইল দিয়ে ব্যাকআপ আপডেট
       if (!profileUpdated && request.email) {
         const cleanEmail = request.email.trim().toLowerCase();
         await supabase
@@ -287,7 +282,6 @@ export default function AdminDashboard() {
           .eq('email', cleanEmail);
       }
 
-      // ৩. ইউজারকে ইমেইল নোটিফিকেশন পাঠানো
       if (request.email) {
         const emailBody = `
 Congratulations! Your Resell Bari Membership has been Activated!
@@ -357,7 +351,7 @@ Support & Login: https://resellbari.com/login
   }
 
   const handleCopyWallet = (text, id) => {
-    if (!text || text === 'UNSET' || text.trim() === '') return alert('No wallet details available to copy!');
+    if (!text || text === 'Unset' || text.trim() === '') return alert('No payout wallet details added yet!');
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -732,7 +726,7 @@ Support & Login: https://resellbari.com/login
     else alert('Error: ' + error.message);
   }
 
-  // Seller Ban Handlers
+  // 🚫 Seller Ban Handler
   async function handleBanSeller(e) {
     e.preventDefault();
     if (!banForm.reason.trim()) return alert("Please provide a reason for the ban.");
@@ -799,8 +793,9 @@ Support & Login: https://resellbari.com/login
     }
   }
 
+  // 🗑️ Permanent Delete Seller Profile
   async function handleDeleteSellerProfile(sellerId, sellerName) {
-    if (!confirm(`⚠️ WARNING: Are you sure you want to PERMANENTLY delete seller "${sellerName}"? This action cannot be undone.`)) return;
+    if (!confirm(`⚠️ PERMANENT TERMINATION WARNING:\n\nAre you sure you want to completely delete reseller "${sellerName}"?\nThis will remove their profile and store settings from the system permanently.`)) return;
     
     try {
       const { error } = await supabase
@@ -809,7 +804,7 @@ Support & Login: https://resellbari.com/login
         .eq('id', sellerId);
 
       if (!error) {
-        alert("Seller profile deleted successfully.");
+        alert("Reseller terminated and deleted permanently.");
         fetchAdminData();
         setSelectedSeller(null);
       } else {
@@ -820,25 +815,36 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 🛡️ Filter Resellers
+  // 👥 Filter & Map Full Reseller Profiles (NO FAKE BKASH FALLBACK)
   const sellersList = useMemo(() => {
     const sellerMap = {};
     profiles
       .filter(p => p.role !== 'admin' && !SUPER_ADMINS.includes(p.email?.toLowerCase()))
       .forEach(p => {
-        const walletMethod = p.payment_method || p.payment_option || 'bKash Personal';
-        const bkashNumber = p.bkash_number || p.bkash || p.payment_number || p.account_number || p.mobile_banking_number || p.payout_number || p.bkash_phone || '';
-        const realPhone = p.phone && p.phone.trim() !== '' ? p.phone : '';
-        const realWalletNum = bkashNumber && bkashNumber.trim() !== '' ? bkashNumber : realPhone;
-
+        // শুধুমাত্র আসল ওয়ালেট তথ্য থাকলে দেখাবে, অন্যথায় 'Unset'
+        const hasCustomWallet = !!p.payment_method;
+        const walletMethod = p.payment_method || 'Unset';
+        const rawWalletNum = p.account_number || p.bkash_number || p.payment_number || '';
+        
         sellerMap[p.id] = {
           id: p.id,
           name: p.full_name || 'Seller',
           email: p.email || 'No Email',
+          phone: p.phone || 'N/A',
+          facebook_page: p.shop_name || 'N/A',
+          website: p.website || 'N/A',
+          address: p.address || 'N/A',
+          district: p.district || 'N/A',
           plan: p.plan || null,
-          phone: realPhone || 'N/A',
-          payment_method: realWalletNum ? `${walletMethod} (${realWalletNum})` : walletMethod,
-          raw_bkash_number: realWalletNum,
+          status: p.status || 'pending',
+          has_wallet: hasCustomWallet,
+          payment_method: hasCustomWallet ? (rawWalletNum ? `${walletMethod} (${rawWalletNum})` : walletMethod) : 'Unset',
+          raw_wallet_num: rawWalletNum,
+          bank_name: p.bank_name || 'N/A',
+          branch_name: p.branch_name || 'N/A',
+          routing_number: p.routing_number || 'N/A',
+          account_name: p.account_name || 'N/A',
+          created_at: p.created_at,
           is_banned: p.is_banned || false,
           ban_reason: p.ban_reason || '',
           ban_expires_at: p.ban_expires_at || null,
@@ -1116,7 +1122,7 @@ Support & Login: https://resellbari.com/login
                       <defs>
                         <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.8}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -1211,22 +1217,29 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 3: RESELLERS */}
+        {/* TAB 3: RESELLERS (COMPLETE PROFILE DATA + BAN + TERMINATE) */}
         {activeTab === 'resellers' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full shadow-lg">
-            <h2 className="text-xl font-bold text-white mb-1">👥 Reseller Management & Seller Hub</h2>
-            <p className="text-xs text-slate-400 mb-6">Registered reseller accounts only (Admin profiles are protected & hidden).</p>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-bold text-white">👥 Reseller Hub & Business Profiles</h2>
+                <p className="text-xs text-slate-400 mt-0.5">View comprehensive registration details, store links, payout methods, or terminate accounts.</p>
+              </div>
+              <span className="text-xs font-bold bg-slate-800 text-emerald-400 px-3.5 py-1.5 rounded-full border border-slate-700">
+                {sellersList.length} Registered Reseller(s)
+              </span>
+            </div>
 
             <div className="overflow-x-auto w-full">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase border-b border-slate-800 font-bold">
-                    <th className="p-4 w-20">Serial</th>
-                    <th className="p-4">Seller Details</th>
+                    <th className="p-4 w-12">#</th>
+                    <th className="p-4">Seller & Business Info</th>
+                    <th className="p-4">Location / Address</th>
                     <th className="p-4">Membership</th>
-                    <th className="p-4">Wallet Info</th>
-                    <th className="p-4">Total Orders</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4">Payout Method</th>
+                    <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50 text-xs text-slate-300">
@@ -1234,36 +1247,101 @@ Support & Login: https://resellbari.com/login
                     <tr><td colSpan={6} className="p-8 text-center text-slate-500">No resellers found.</td></tr>
                   ) : (
                     sellersList.map((seller, idx) => (
-                      <tr key={seller.id} className={`hover:bg-slate-800/20 transition ${seller.is_banned ? 'bg-rose-950/10' : ''}`}>
+                      <tr key={seller.id} className={`hover:bg-slate-800/20 transition ${seller.is_banned ? 'bg-rose-950/20' : ''}`}>
                         <td className="p-4 font-mono font-bold text-emerald-400 text-sm">#{idx + 1}</td>
+                        
+                        {/* Seller & Business Info */}
                         <td className="p-4">
                           <div className="font-bold text-white text-sm flex items-center gap-2">
                             {seller.name}
                             {seller.is_banned && <span className="bg-rose-500 text-white text-[9px] px-2 py-0.5 rounded font-black">BANNED</span>}
                           </div>
-                          <div className="text-slate-300 text-xs">{seller.email}</div>
-                          <div className="text-slate-500 text-[11px]">{seller.phone}</div>
+                          <div className="text-slate-300 text-xs mt-0.5">{seller.email}</div>
+                          <div className="text-emerald-400 font-mono text-[11px] mt-0.5">📞 {seller.phone}</div>
+                          
+                          {/* Store / Facebook Link */}
+                          {seller.facebook_page && seller.facebook_page !== 'N/A' && (
+                            <div className="mt-1 text-[11px]">
+                              <span className="text-slate-400">FB / Shop: </span>
+                              <a href={seller.facebook_page.startsWith('http') ? seller.facebook_page : `https://${seller.facebook_page}`} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-semibold">
+                                {seller.facebook_page}
+                              </a>
+                            </div>
+                          )}
+                          {seller.website && seller.website !== 'N/A' && (
+                            <div className="text-[11px]">
+                              <span className="text-slate-400">Web: </span>
+                              <a href={seller.website.startsWith('http') ? seller.website : `https://${seller.website}`} target="_blank" rel="noreferrer" className="text-teal-400 hover:underline">
+                                {seller.website}
+                              </a>
+                            </div>
+                          )}
                         </td>
+
+                        {/* Location */}
+                        <td className="p-4">
+                          <div className="font-bold text-slate-200">{seller.district || 'Unset'}</div>
+                          <div className="text-slate-400 text-[11px] mt-0.5 max-w-xs truncate">{seller.address || 'Address not provided'}</div>
+                        </td>
+
+                        {/* Membership */}
                         <td className="p-4">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase ${
-                            seller.plan ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400'
+                            seller.plan ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                           }`}>
                             {seller.plan || 'NO PLAN'}
                           </span>
+                          <div className="text-[10px] text-slate-500 mt-1 capitalize">Status: {seller.status}</div>
                         </td>
+
+                        {/* Payout Method (Real custom wallet only) */}
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-emerald-400 uppercase">{seller.payment_method}</span>
-                            <button onClick={() => handleCopyWallet(seller.raw_bkash_number || seller.payment_method, seller.id)} className="bg-slate-800 text-xs px-2.5 py-1 rounded-lg text-emerald-400 font-bold">
-                              {copiedId === seller.id ? '✓' : '📋'}
+                          {seller.has_wallet ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-emerald-400">{seller.payment_method}</span>
+                              <button onClick={() => handleCopyWallet(seller.raw_wallet_num || seller.payment_method, seller.id)} className="bg-slate-800 text-xs px-2.5 py-1 rounded-lg text-emerald-400 font-bold cursor-pointer">
+                                {copiedId === seller.id ? '✓' : '📋'}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-500 italic">Unset / Not Added</span>
+                          )}
+                        </td>
+
+                        {/* Actions (View + Ban + Terminate) */}
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => setSelectedSeller(seller)} 
+                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold rounded-xl text-xs cursor-pointer shadow-md"
+                            >
+                              📊 View
+                            </button>
+
+                            {seller.is_banned ? (
+                              <button 
+                                onClick={() => handleUnbanSeller(seller.id)} 
+                                className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl font-bold text-xs cursor-pointer"
+                              >
+                                Unban
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => setBanForm({ show: true, sellerId: seller.id, sellerName: seller.name, duration: '24h', reason: '' })} 
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-xl font-bold text-xs cursor-pointer"
+                              >
+                                🚫 Ban
+                              </button>
+                            )}
+
+                            <button 
+                              onClick={() => handleDeleteSellerProfile(seller.id, seller.name)} 
+                              className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl font-bold text-xs cursor-pointer"
+                              title="Permanently Terminate Reseller"
+                            >
+                              🗑️
                             </button>
                           </div>
-                        </td>
-                        <td className="p-4 font-semibold text-slate-200">{seller.orders.length} Orders</td>
-                        <td className="p-4 text-right">
-                          <button onClick={() => setSelectedSeller(seller)} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-2xl text-xs cursor-pointer">
-                            📊 View Dashboard
-                          </button>
                         </td>
                       </tr>
                     ))
@@ -1601,6 +1679,352 @@ Support & Login: https://resellbari.com/login
 
       </main>
 
+      {/* 🛡️ BAN SELLER MODAL */}
+      {banForm.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="bg-slate-900 border border-rose-900/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-rose-400">🚫 Ban Reseller: {banForm.sellerName}</h3>
+              <button onClick={() => setBanForm({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' })} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
+            </div>
+            <form onSubmit={handleBanSeller} className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-300 block mb-1 font-semibold">Ban Duration</label>
+                <select 
+                  value={banForm.duration} 
+                  onChange={(e) => setBanForm({ ...banForm, duration: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none"
+                >
+                  <option value="5h">5 Hours</option>
+                  <option value="12h">12 Hours</option>
+                  <option value="24h">24 Hours (1 Day)</option>
+                  <option value="7d">7 Days</option>
+                  <option value="permanent">Permanent Ban</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-300 block mb-1 font-semibold">Reason for Suspension *</label>
+                <textarea 
+                  required
+                  rows={3}
+                  placeholder="e.g. Terms violation, suspicious orders, etc."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-rose-500"
+                  value={banForm.reason}
+                  onChange={(e) => setBanForm({ ...banForm, reason: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2.5">
+                <button type="button" onClick={() => setBanForm({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' })} className="w-1/2 bg-slate-800 text-slate-300 py-3 rounded-xl text-xs font-bold cursor-pointer">Cancel</button>
+                <button type="submit" disabled={isBanning} className="w-1/2 bg-rose-600 hover:bg-rose-500 text-white py-3 rounded-xl text-xs font-bold transition cursor-pointer">{isBanning ? 'Suspending...' : 'Confirm Suspension'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 📊 SELLER COMPLETE DETAILS & DASHBOARD MODAL */}
+      {selectedSeller && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl w-full max-w-4xl space-y-6 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-white">📊 Reseller Complete Profile: {selectedSeller.name}</h3>
+                <p className="text-xs text-slate-400 mt-1">ID: #{selectedSeller.id} | Joined: {new Date(selectedSeller.created_at || Date.now()).toLocaleDateString()}</p>
+              </div>
+              <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
+            </div>
+
+            {/* Registration Full Info Grid */}
+            <div className="bg-slate-950/70 border border-slate-800 p-5 rounded-2xl space-y-3">
+              <h4 className="text-xs uppercase font-extrabold text-emerald-400 tracking-wider">Registration Form Details</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Full Name</span>
+                  <strong className="text-slate-200 text-sm">{selectedSeller.name}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Email Address</span>
+                  <strong className="text-slate-200 text-sm">{selectedSeller.email}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Phone Number</span>
+                  <strong className="text-emerald-400 text-sm font-mono">{selectedSeller.phone}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Facebook Page Link</span>
+                  <a href={selectedSeller.facebook_page.startsWith('http') ? selectedSeller.facebook_page : `https://${selectedSeller.facebook_page}`} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline font-semibold break-all">
+                    {selectedSeller.facebook_page}
+                  </a>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Website Link</span>
+                  <span className="text-slate-200 break-all">{selectedSeller.website}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">District & Address</span>
+                  <strong className="text-slate-200">{selectedSeller.district}</strong>
+                  <p className="text-slate-400 text-[11px] mt-0.5">{selectedSeller.address}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payout Banking Details */}
+            <div className="bg-slate-950/70 border border-slate-800 p-5 rounded-2xl space-y-3">
+              <h4 className="text-xs uppercase font-extrabold text-amber-400 tracking-wider">Payout / Wallet Information</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Payment Method</span>
+                  <strong className="text-slate-200 text-sm">{selectedSeller.payment_method}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Bank / Provider</span>
+                  <strong className="text-slate-200">{selectedSeller.bank_name}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Account / Number</span>
+                  <strong className="text-emerald-400 font-mono text-sm">{selectedSeller.raw_wallet_num || 'N/A'}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
+                <p className="text-xs text-slate-400 uppercase font-semibold">Total Orders</p>
+                <h4 className="text-3xl font-black text-white mt-1">{selectedSeller.orders.length}</h4>
+              </div>
+              <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
+                <p className="text-xs text-slate-400 uppercase font-semibold">Total Sales Value</p>
+                <h4 className="text-3xl font-black text-emerald-400 mt-1">৳{selectedSeller.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)}</h4>
+              </div>
+              <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
+                <p className="text-xs text-slate-400 uppercase font-semibold">Total Profit Earned</p>
+                <h4 className="text-3xl font-black text-teal-400 mt-1">৳{selectedSeller.orders.reduce((sum, o) => sum + Number(o.profit_amount || 0), 0)}</h4>
+              </div>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex flex-wrap justify-between items-center pt-4 border-t border-slate-800 gap-3">
+              <button 
+                onClick={() => handleDeleteSellerProfile(selectedSeller.id, selectedSeller.name)}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-lg shadow-rose-600/20"
+              >
+                🗑️ Terminate Reseller Permanently
+              </button>
+              <button onClick={() => setSelectedSeller(null)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-6 py-2.5 rounded-xl text-xs cursor-pointer">Close Window</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚙️ FULL ORDER MANAGEMENT MODAL */}
+      {managingOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative my-8 space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚙️</span>
+                <div>
+                  <h3 className="text-lg font-black text-white">Order Management</h3>
+                  <span className="text-[11px] font-mono text-slate-400">Order ID: #{managingOrder.id}</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setManagingOrder(null)} 
+                className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {managingOrder.status === 'cancel_requested' && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
+                  <span>⚠️</span> Reseller requested cancellation: "{managingOrder.cancel_reason || 'Customer changed mind'}"
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => handleApproveCancel(managingOrder.id)}
+                    className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-xl text-xs transition cursor-pointer"
+                  >
+                    ✓ Approve Cancellation
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const reason = prompt('Enter reason for declining cancel request:');
+                      if (reason) {
+                        setDeclineNoteInput(reason);
+                        handleDeclineCancel(managingOrder.id);
+                      }
+                    }}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 rounded-xl text-xs border border-slate-700 transition cursor-pointer"
+                  >
+                    ✕ Decline Request
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveOrderDetails} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Customer Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                    value={managingOrder.customer_name || ''}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, customer_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Customer Phone
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    value={managingOrder.customer_phone || ''}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, customer_phone: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                  Delivery Address
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                  value={managingOrder.delivery_address || ''}
+                  onChange={(e) => setManagingOrder({ ...managingOrder, delivery_address: e.target.value })}
+                />
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Product</span>
+                  <strong className="text-slate-200 text-sm">{managingOrder.product_name || 'General Product'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Quantity</span>
+                  <strong className="text-slate-200 text-sm">{managingOrder.quantity || 1} pcs</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Seller Name</span>
+                  <strong className="text-amber-400 text-xs">{managingOrder.seller_name || 'N/A'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Total Amount</span>
+                  <input
+                    type="number"
+                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-bold w-full mt-1"
+                    value={managingOrder.total_amount || 0}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, total_amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Reseller Profit</span>
+                  <input
+                    type="number"
+                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-emerald-400 font-bold w-full mt-1"
+                    value={managingOrder.profit_amount || 0}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, profit_amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Delivery Charge</span>
+                  <input
+                    type="number"
+                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-bold w-full mt-1"
+                    value={managingOrder.delivery_charge || 0}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, delivery_charge: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Order Status
+                  </label>
+                  <select
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-bold capitalize"
+                    value={managingOrder.status || 'pending'}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, status: e.target.value })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="picked_up">Picked Up</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="cancel_requested">Cancel Requested</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Payout Status
+                  </label>
+                  <select
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-bold uppercase"
+                    value={managingOrder.payout_status || 'pending'}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, payout_status: e.target.value })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="hold">Hold</option>
+                  </select>
+                </div>
+              </div>
+
+              {managingOrder.payout_status === 'hold' && (
+                <div>
+                  <label className="text-xs font-bold text-rose-400 block mb-1 uppercase tracking-wider">
+                    Reason for Holding Payment
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Needs account verification"
+                    className="w-full bg-slate-950 border border-rose-900/60 rounded-xl p-3 text-xs text-rose-300 focus:outline-none"
+                    value={managingOrder.payout_hold_reason || ''}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, payout_hold_reason: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2.5 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handlePrintInvoice}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-indigo-500/20"
+                >
+                  🖨️ Print Invoice
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateOrderLoading}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
+                >
+                  {updateOrderLoading ? 'Saving...' : '💾 Update Order'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* 🛡️ EDIT STAFF PERMISSIONS MODAL */}
       {editingStaff && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -1677,257 +2101,6 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
       </AnimatePresence>
-
-      {/* 📊 SELLER DASHBOARD MODAL */}
-      {selectedSeller && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl w-full max-w-4xl space-y-6 shadow-2xl relative my-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-4 gap-4">
-              <div>
-                <h3 className="text-xl font-extrabold text-white">📊 Seller Dashboard: {selectedSeller.name}</h3>
-                <p className="text-xs text-slate-400 mt-1">Email: {selectedSeller.email} | Phone: {selectedSeller.phone}</p>
-              </div>
-              <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
-                <p className="text-xs text-slate-400 uppercase font-semibold">Total Orders</p>
-                <h4 className="text-3xl font-black text-white mt-1">{selectedSeller.orders.length}</h4>
-              </div>
-              <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
-                <p className="text-xs text-slate-400 uppercase font-semibold">Total Sales Value</p>
-                <h4 className="text-3xl font-black text-emerald-400 mt-1">৳{selectedSeller.orders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)}</h4>
-              </div>
-              <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
-                <p className="text-xs text-slate-400 uppercase font-semibold">Total Profit Earned</p>
-                <h4 className="text-3xl font-black text-teal-400 mt-1">৳{selectedSeller.orders.reduce((sum, o) => sum + Number(o.profit_amount || 0), 0)}</h4>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-4 border-t border-slate-800">
-              <button onClick={() => setSelectedSeller(null)} className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-6 py-3 rounded-2xl text-xs cursor-pointer">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ⚙️ FULL COMPLETE ORDER MANAGEMENT MODAL */}
-      {managingOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative my-8 space-y-5 max-h-[90vh] overflow-y-auto">
-            
-            {/* Header */}
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xl">⚙️</span>
-                <div>
-                  <h3 className="text-lg font-black text-white">Order Management</h3>
-                  <span className="text-[11px] font-mono text-slate-400">Order ID: #{managingOrder.id}</span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setManagingOrder(null)} 
-                className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Cancellation Notice if requested */}
-            {managingOrder.status === 'cancel_requested' && (
-              <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl space-y-3">
-                <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
-                  <span>⚠️</span> Reseller requested cancellation: "{managingOrder.cancel_reason || 'Customer changed mind'}"
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    type="button"
-                    onClick={() => handleApproveCancel(managingOrder.id)}
-                    className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-xl text-xs transition cursor-pointer"
-                  >
-                    ✓ Approve Cancellation
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      const reason = prompt('Enter reason for declining cancel request:');
-                      if (reason) {
-                        setDeclineNoteInput(reason);
-                        handleDeclineCancel(managingOrder.id);
-                      }
-                    }}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 rounded-xl text-xs border border-slate-700 transition cursor-pointer"
-                  >
-                    ✕ Decline Request
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleSaveOrderDetails} className="space-y-4">
-              
-              {/* Customer Info */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
-                    Customer Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
-                    value={managingOrder.customer_name || ''}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, customer_name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
-                    Customer Phone
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
-                    value={managingOrder.customer_phone || ''}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, customer_phone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Delivery Address */}
-              <div>
-                <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
-                  Delivery Address
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
-                  value={managingOrder.delivery_address || ''}
-                  onChange={(e) => setManagingOrder({ ...managingOrder, delivery_address: e.target.value })}
-                />
-              </div>
-
-              {/* Product & Price Summary Cards */}
-              <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                <div>
-                  <span className="text-slate-500 block">Product</span>
-                  <strong className="text-slate-200 text-sm">{managingOrder.product_name || 'General Product'}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Quantity</span>
-                  <strong className="text-slate-200 text-sm">{managingOrder.quantity || 1} pcs</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Seller Name</span>
-                  <strong className="text-amber-400 text-xs">{managingOrder.seller_name || 'N/A'}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Total Amount</span>
-                  <input
-                    type="number"
-                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-bold w-full mt-1"
-                    value={managingOrder.total_amount || 0}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, total_amount: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Reseller Profit</span>
-                  <input
-                    type="number"
-                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-emerald-400 font-bold w-full mt-1"
-                    value={managingOrder.profit_amount || 0}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, profit_amount: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Delivery Charge</span>
-                  <input
-                    type="number"
-                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-bold w-full mt-1"
-                    value={managingOrder.delivery_charge || 0}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, delivery_charge: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Status Selectors */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
-                    Order Status
-                  </label>
-                  <select
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-bold capitalize"
-                    value={managingOrder.status || 'pending'}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, status: e.target.value })}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="picked_up">Picked Up</option>
-                    <option value="in_transit">In Transit</option>
-                    <option value="out_for_delivery">Out for Delivery</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="cancel_requested">Cancel Requested</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
-                    Payout Status
-                  </label>
-                  <select
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-bold uppercase"
-                    value={managingOrder.payout_status || 'pending'}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, payout_status: e.target.value })}
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="hold">Hold</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Payout Hold Reason */}
-              {managingOrder.payout_status === 'hold' && (
-                <div>
-                  <label className="text-xs font-bold text-rose-400 block mb-1 uppercase tracking-wider">
-                    Reason for Holding Payment
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Needs bKash number verification"
-                    className="w-full bg-slate-950 border border-rose-900/60 rounded-xl p-3 text-xs text-rose-300 focus:outline-none"
-                    value={managingOrder.payout_hold_reason || ''}
-                    onChange={(e) => setManagingOrder({ ...managingOrder, payout_hold_reason: e.target.value })}
-                  />
-                </div>
-              )}
-
-              {/* Buttons */}
-              <div className="flex gap-2.5 pt-4 border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={handlePrintInvoice}
-                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-indigo-500/20"
-                >
-                  🖨️ Print Invoice
-                </button>
-                <button
-                  type="submit"
-                  disabled={updateOrderLoading}
-                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
-                >
-                  {updateOrderLoading ? 'Saving...' : '💾 Update Order'}
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );
