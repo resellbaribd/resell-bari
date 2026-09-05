@@ -13,7 +13,10 @@ export default function ResellerDashboard() {
   const [orders, setOrders] = useState([]);
   const [packages, setPackages] = useState([]);
   const [stats, setStats] = useState({ pending: 0, shipped: 0, profit: 0, totalPaid: 0, totalPendingPayout: 0 });
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  
+  // Modals State
+  const [trackingOrder, setTrackingOrder] = useState(null);
+  const [viewingOrderDetails, setViewingOrderDetails] = useState(null);
   const [showPkgModal, setShowPkgModal] = useState(false);
 
   // 📱 Mobile Menu State
@@ -93,7 +96,6 @@ export default function ResellerDashboard() {
         return;
       }
 
-      // ১. প্রোফাইল ডাটা আনা
       let { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -105,7 +107,6 @@ export default function ResellerDashboard() {
       const isAdmin = SUPER_ADMINS.includes(userEmail) || profileData?.role?.toLowerCase() === 'admin';
 
       if (!isAdmin) {
-        // ২. 🛡️ LOOP BREAKER: activation_requests-এ approved আছে কি না চেক
         const { data: approvedReq } = await supabase
           .from('activation_requests')
           .select('status, plan')
@@ -119,7 +120,6 @@ export default function ResellerDashboard() {
         const hasValidPlan = currentPlanName && validPlans.includes(currentPlanName);
         const isActive = profileData?.status === 'active';
 
-        // যদি approved রিকোয়েস্ট থাকে কিন্তু প্রোফাইল এখনও পেন্ডিং, তবে প্রোফাইলটি অটোমেটিক একটিভ করে এখানেই ড্যাশবোর্ডে ধরে রাখা হবে
         if ((!hasValidPlan || !isActive) && approvedReq) {
           const rawPlan = approvedReq.plan?.toLowerCase() || 'basic';
           let cleanPlan = 'basic';
@@ -140,9 +140,7 @@ export default function ResellerDashboard() {
             plan: cleanPlan,
             status: 'active'
           };
-        } 
-        // যদি পেমেন্ট রিকোয়েস্টও approved না থাকে এবং প্রোফাইলও active না থাকে, শুধুমাত্র তখনই অ্যাক্টিভেশন পেজে রিডাইরেক্ট করবে
-        else if (!hasValidPlan || !isActive) {
+        } else if (!hasValidPlan || !isActive) {
           router.replace('/account-activation');
           return;
         }
@@ -342,7 +340,7 @@ export default function ResellerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* 🧭 PROFESSIONAL LEFT SIDEBAR NAVIGATION */}
+      {/* 🧭 SIDEBAR NAVIGATION */}
       <aside className={`
         fixed md:sticky top-0 left-0 z-50 h-screen overflow-y-auto
         w-72 bg-slate-900/95 border-r border-slate-800/80 p-6 flex flex-col justify-between shrink-0 backdrop-blur-2xl
@@ -454,7 +452,7 @@ export default function ResellerDashboard() {
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
           <div>
             <h2 className="text-2xl font-black text-white">Reseller Control Dashboard</h2>
-            <p className="text-xs text-slate-400 mt-1">Track orders, monitor profits, request cancellations, and review payouts in real-time.</p>
+            <p className="text-xs text-slate-400 mt-1">Track orders, view complete selling bills, and review payouts in real-time.</p>
           </div>
           <div className="flex items-center gap-3">
             <button 
@@ -544,43 +542,62 @@ export default function ResellerDashboard() {
                       <h4 className="font-bold text-white text-base">{o.customer_name}</h4>
                       <p className="text-xs text-slate-400 mt-0.5">{o.customer_phone}</p>
                     </div>
-                    <button 
-                      onClick={() => setSelectedOrder(o)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold cursor-pointer"
-                    >
-                      📍 Track
-                    </button>
+                    <div className="flex gap-1.5">
+                      <button 
+                        onClick={() => setViewingOrderDetails(o)}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold"
+                      >
+                        👁️ View
+                      </button>
+                      <button 
+                        onClick={() => setTrackingOrder(o)}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold"
+                      >
+                        📍 Track
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-900/70 p-2.5 rounded-xl border border-slate-800">
+                    <div>
+                      <span className="text-slate-400 block">Total Bill:</span>
+                      <strong className="text-white text-sm">৳{o.total_amount || 0}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Your Profit:</span>
+                      <strong className="text-emerald-400 text-sm">+৳{o.profit_amount || 0}</strong>
+                    </div>
                   </div>
 
                   {o.decline_note && (
-                    <p className="text-xs bg-rose-500/10 text-rose-400 border border-rose-500/30 p-2.5 rounded-xl">
+                    <p className="text-xs bg-rose-500/10 text-rose-400 border border-rose-500/30 p-2 rounded-xl">
                       ⚠️ Cancel Declined: {o.decline_note}
                     </p>
                   )}
 
-                  <div className="flex justify-between items-center pt-3 border-t border-slate-800/60 text-xs">
-                    <span className="text-slate-400">Profit: <strong className="text-emerald-400 text-sm">৳{o.profit_amount || 0}</strong></span>
-                    {o.status === 'pending' && (
+                  {o.status === 'pending' && (
+                    <div className="pt-2 border-t border-slate-800/60 flex justify-end">
                       <button 
                         onClick={() => setCancellingOrder(o)} 
-                        className="px-3.5 py-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                        className="px-3 py-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold"
                       >
                         ❌ Cancel Request
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
 
-          {/* Desktop Table View */}
+          {/* Desktop Table View (WITH TOTAL SELLING & VIEW DETAILS BUTTON) */}
           <div className="hidden lg:block overflow-x-auto w-full">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-800/40 text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
                   <th className="p-5">Customer</th>
                   <th className="p-5">Phone</th>
+                  <th className="p-5">Total Selling</th>
                   <th className="p-5">Your Profit</th>
                   <th className="p-5">Order Status</th>
                   <th className="p-5">Payout Status</th>
@@ -590,7 +607,7 @@ export default function ResellerDashboard() {
               <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
                 {orders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500 text-xs font-medium">
+                    <td colSpan={7} className="p-8 text-center text-slate-500 text-xs font-medium">
                       No orders placed yet.
                     </td>
                   </tr>
@@ -606,7 +623,12 @@ export default function ResellerDashboard() {
                         )}
                       </td>
                       <td className="p-5 text-slate-400 font-mono">{o.customer_phone}</td>
-                      <td className="p-5 font-bold text-emerald-400 text-base">+ ৳{o.profit_amount || 0}</td>
+                      <td className="p-5 font-extrabold text-white text-base">
+                        ৳{o.total_amount || 0}
+                      </td>
+                      <td className="p-5 font-bold text-emerald-400 text-base">
+                        + ৳{o.profit_amount || 0}
+                      </td>
                       <td className="p-5">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border capitalize ${
                           o.status === 'cancel_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
@@ -622,16 +644,28 @@ export default function ResellerDashboard() {
                         {(!o.payout_status || o.payout_status === 'pending') && <span className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-full text-xs font-bold">🟡 Pending</span>}
                       </td>
                       <td className="p-5 text-right space-x-2">
+                        {/* 👁️ VIEW FULL ORDER DETAILS BUTTON */}
                         <button 
-                          onClick={() => setSelectedOrder(o)}
-                          className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold transition cursor-pointer"
+                          onClick={() => setViewingOrderDetails(o)}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-bold transition cursor-pointer"
+                          title="View Complete Order Details & Products"
+                        >
+                          👁️ View
+                        </button>
+                        
+                        {/* 📍 TRACK BUTTON */}
+                        <button 
+                          onClick={() => setTrackingOrder(o)}
+                          className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-bold transition cursor-pointer"
                         >
                           📍 Track
                         </button>
+
+                        {/* CANCEL BUTTON */}
                         {o.status === 'pending' && (
                           <button 
                             onClick={() => setCancellingOrder(o)}
-                            className="px-4 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer"
+                            className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition cursor-pointer"
                           >
                             ❌ Cancel Request
                           </button>
@@ -647,7 +681,135 @@ export default function ResellerDashboard() {
 
       </main>
 
-      {/* 🔴 CANCEL REQUEST REASON MODAL */}
+      {/* 👁️ FULL ORDER DETAILS MODAL (ALL PRODUCTS & BILLING BREAKDOWN) */}
+      <AnimatePresence>
+        {viewingOrderDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                    📦 Order Invoice Details
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Order ID: #{viewingOrderDetails.id}</p>
+                </div>
+                <button 
+                  onClick={() => setViewingOrderDetails(null)}
+                  className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Customer Delivery Info */}
+              <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2 text-xs">
+                <h4 className="text-[11px] font-extrabold uppercase text-emerald-400 tracking-wider">Customer & Delivery Information</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300">
+                  <div>
+                    <span className="text-slate-500 block">Recipient Name:</span>
+                    <strong className="text-white text-sm">{viewingOrderDetails.customer_name}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Phone Number:</span>
+                    <strong className="text-white text-sm font-mono">{viewingOrderDetails.customer_phone}</strong>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <span className="text-slate-500 block">Delivery Address:</span>
+                    <span className="text-slate-200">{viewingOrderDetails.delivery_address}</span>
+                  </div>
+                  {viewingOrderDetails.customer_note && (
+                    <div className="sm:col-span-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                      <span className="text-amber-400 block font-bold">Special Note:</span>
+                      <p className="text-slate-300 italic">"{viewingOrderDetails.customer_note}"</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Ordered Products Table */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider">Product Items in this Order</h4>
+                <div className="space-y-2">
+                  {viewingOrderDetails.order_items && Array.isArray(viewingOrderDetails.order_items) && viewingOrderDetails.order_items.length > 0 ? (
+                    viewingOrderDetails.order_items.map((item, idx) => (
+                      <div key={idx} className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex justify-between items-center text-xs">
+                        <div className="flex items-center gap-3">
+                          <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-[10px]">
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <h5 className="font-bold text-white text-sm">{item.name}</h5>
+                            <p className="text-slate-400 text-[11px] mt-0.5">
+                              Qty: <strong>{item.quantity}</strong> × Rate: ৳{item.unit_selling_price || item.selling_price} (Wholesale: ৳{item.base_price})
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="block font-bold text-white text-sm">৳{item.total_selling || (item.unit_selling_price * item.quantity)}</span>
+                          <span className="block text-[11px] font-bold text-emerald-400">+৳{item.profit || 0} profit</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800 flex justify-between items-center text-xs">
+                      <div>
+                        <h5 className="font-bold text-white text-sm">{viewingOrderDetails.product_name}</h5>
+                        <p className="text-slate-400 text-[11px] mt-0.5">Quantity: {viewingOrderDetails.quantity || 1} pcs</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="block font-bold text-white text-sm">৳{viewingOrderDetails.selling_price || viewingOrderDetails.total_amount}</span>
+                        <span className="block text-[11px] font-bold text-emerald-400">+৳{viewingOrderDetails.profit_amount || 0} profit</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Complete Cost & Profit Breakdown */}
+              <div className="bg-slate-950/90 p-4 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                <div className="flex justify-between text-slate-400">
+                  <span>Base Wholesale Cost:</span>
+                  <span className="font-bold text-white">৳{viewingOrderDetails.base_price || 0}</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>Delivery Charge (+):</span>
+                  <span className="font-bold text-white">৳{viewingOrderDetails.delivery_charge || 0}</span>
+                </div>
+                {Number(viewingOrderDetails.discount || 0) > 0 && (
+                  <div className="flex justify-between text-amber-400">
+                    <span>Discount (-):</span>
+                    <span className="font-bold">- ৳{viewingOrderDetails.discount}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-emerald-400 font-black text-sm pt-2 border-t border-slate-800">
+                  <span>Your Net Profit:</span>
+                  <span>+ ৳{viewingOrderDetails.profit_amount || 0}</span>
+                </div>
+                <div className="flex justify-between text-white font-black text-base pt-2 border-t border-slate-800">
+                  <span>Customer Total Bill (Total Amount):</span>
+                  <span className="text-emerald-400">৳{viewingOrderDetails.total_amount || 0}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button 
+                  onClick={() => setViewingOrderDetails(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-white font-bold px-6 py-2.5 rounded-xl border border-slate-700 text-xs cursor-pointer"
+                >
+                  Close Details
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* 🔴 CANCEL REQUEST MODAL */}
       <AnimatePresence>
         {cancellingOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -701,9 +863,9 @@ export default function ResellerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* TIMELINE PROGRESS MODAL */}
+      {/* 📍 TIMELINE TRACKING PROGRESS MODAL */}
       <AnimatePresence>
-        {selectedOrder && (
+        {trackingOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
@@ -714,10 +876,10 @@ export default function ResellerDashboard() {
               <div className="flex justify-between items-start border-b border-slate-800 pb-4 mb-6">
                 <div>
                   <h3 className="text-xl font-bold text-white">Order Progress Timeline</h3>
-                  <p className="text-xs text-slate-400 mt-1">Customer: <strong className="text-slate-200">{selectedOrder.customer_name}</strong> | Phone: {selectedOrder.customer_phone}</p>
+                  <p className="text-xs text-slate-400 mt-1">Customer: <strong className="text-slate-200">{trackingOrder.customer_name}</strong> | Phone: {trackingOrder.customer_phone}</p>
                 </div>
                 <button 
-                  onClick={() => setSelectedOrder(null)}
+                  onClick={() => setTrackingOrder(null)}
                   className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
                 >
                   ✕
@@ -733,13 +895,13 @@ export default function ResellerDashboard() {
                     <div 
                       className="h-full bg-emerald-500 transition-all duration-500" 
                       style={{ 
-                        width: `${Math.max(0, getStepIndex(selectedOrder.status)) * 25}%` 
+                        width: `${Math.max(0, getStepIndex(trackingOrder.status)) * 25}%` 
                       }} 
                     />
                   </div>
 
                   {trackingSteps.map((step, idx) => {
-                    const currentIndex = getStepIndex(selectedOrder.status);
+                    const currentIndex = getStepIndex(trackingOrder.status);
                     const isCompleted = idx <= currentIndex;
 
                     return (
@@ -775,25 +937,25 @@ export default function ResellerDashboard() {
               <div className="mt-8 p-4 rounded-2xl bg-slate-800/50 border border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div>
                   <span className="text-slate-500 block">Your Profit</span>
-                  <strong className="text-emerald-400 text-sm">৳{selectedOrder.profit_amount || 0}</strong>
+                  <strong className="text-emerald-400 text-sm">৳{trackingOrder.profit_amount || 0}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">Selling Price</span>
-                  <strong className="text-slate-200 text-sm">৳{selectedOrder.total_amount}</strong>
+                  <span className="text-slate-500 block">Total Selling</span>
+                  <strong className="text-slate-200 text-sm">৳{trackingOrder.total_amount}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">Payout Status</span>
-                  <strong className="text-slate-200 text-sm uppercase">{selectedOrder.payout_status || 'Pending'}</strong>
+                  <strong className="text-slate-200 text-sm uppercase">{trackingOrder.payout_status || 'Pending'}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">Current Status</span>
-                  <strong className="text-emerald-400 text-sm uppercase">{selectedOrder.status?.replace('_', ' ')}</strong>
+                  <strong className="text-emerald-400 text-sm uppercase">{trackingOrder.status?.replace('_', ' ')}</strong>
                 </div>
               </div>
 
               <div className="mt-6 flex justify-end">
                 <button 
-                  onClick={() => setSelectedOrder(null)}
+                  onClick={() => setTrackingOrder(null)}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-6 py-2.5 rounded-xl border border-slate-700 text-xs cursor-pointer"
                 >
                   Close Progress Window
