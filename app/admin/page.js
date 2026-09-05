@@ -79,7 +79,7 @@ export default function AdminDashboard() {
     email: '',
     name: '',
     password: '',
-    permissions: ['orders', 'inventory'] // Default permissions
+    permissions: ['orders', 'inventory']
   });
   const [creatingStaff, setCreatingStaff] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🛡️ Staff / Sub-Admin Creation & Permission Handler
+  // 🛡️ Staff / Sub-Admin Creation
   async function handleCreateStaff(e) {
     e.preventDefault();
     if (!staffForm.email || !staffForm.password) return alert('Email & password are required');
@@ -164,7 +164,6 @@ export default function AdminDashboard() {
 
     setCreatingStaff(true);
     try {
-      // 1. Sign up staff in Auth
       const { data: authData, error: authErr } = await supabase.auth.signUp({
         email: staffForm.email.trim().toLowerCase(),
         password: staffForm.password,
@@ -177,7 +176,6 @@ export default function AdminDashboard() {
 
       const newUserId = authData.user?.id;
 
-      // 2. Insert into profiles with 'admin' role and specific permissions
       if (newUserId) {
         await supabase.from('profiles').upsert([{
           id: newUserId,
@@ -199,7 +197,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🛡️ Update Staff Permissions
   async function handleUpdateStaffPermissions(staffId, newPermissions) {
     try {
       const { error } = await supabase
@@ -217,7 +214,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🛡️ Revoke Admin Access
   async function handleRevokeStaff(staffId, email) {
     if (SUPER_ADMINS.includes(email?.toLowerCase())) {
       return alert('Super Admin cannot be deleted or revoked!');
@@ -432,6 +428,7 @@ Support & Login: https://resellbari.com/login
   const handleSelectOrder = (id) => setSelectedOrderIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const handleSelectAllOrders = () => setSelectedOrderIds(selectedOrderIds.length === orders.length ? [] : orders.map(o => o.id));
 
+  // ⚙️ Save Full Order Details
   async function handleSaveOrderDetails(e) {
     e.preventDefault();
     setUpdateOrderLoading(true);
@@ -447,6 +444,8 @@ Support & Login: https://resellbari.com/login
           profit_amount: Number(managingOrder.profit_amount) || 0,
           delivery_charge: Number(managingOrder.delivery_charge) || 0,
           status: managingOrder.status,
+          payout_status: managingOrder.payout_status || 'pending',
+          payout_hold_reason: managingOrder.payout_status === 'hold' ? (managingOrder.payout_hold_reason || '') : null,
           updated_at: new Date()
         })
         .eq('id', managingOrder.id);
@@ -583,7 +582,7 @@ Support & Login: https://resellbari.com/login
     else alert('Error: ' + error.message);
   }
 
-  // 🌟 Add Product
+  // Product Handlers
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
@@ -623,7 +622,6 @@ Support & Login: https://resellbari.com/login
     else alert('Error: ' + error.message);
   }
 
-  // 🌟 Update Product
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -657,15 +655,7 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  const handleAddFeatureToPkg = () => {
-    if (!pkgForm.featureInput.trim()) return;
-    setPkgForm({ ...pkgForm, features: [...pkgForm.features, pkgForm.featureInput.trim()], featureInput: '' });
-  };
-
-  const handleRemoveFeature = (idx) => {
-    setPkgForm({ ...pkgForm, features: pkgForm.features.filter((_, i) => i !== idx) });
-  };
-
+  // Package Handlers
   async function handleSavePackage(e) {
     e.preventDefault();
     setSavingPkg(true);
@@ -712,6 +702,7 @@ Support & Login: https://resellbari.com/login
     else alert('Error: ' + error.message);
   }
 
+  // Seller Ban Handlers
   async function handleBanSeller(e) {
     e.preventDefault();
     if (!banForm.reason.trim()) return alert("Please provide a reason for the ban.");
@@ -799,7 +790,7 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 🛡️ Filter Resellers (EXCLUDES ADMIN ACCOUNTS COMPLETELY)
+  // 🛡️ Filter Resellers
   const sellersList = useMemo(() => {
     const sellerMap = {};
     profiles
@@ -835,7 +826,6 @@ Support & Login: https://resellbari.com/login
     return Object.values(sellerMap);
   }, [profiles, orders]);
 
-  // 🛡️ Staff / Admin Members List
   const staffList = useMemo(() => {
     return profiles.filter(p => p.role === 'admin' || SUPER_ADMINS.includes(p.email?.toLowerCase()));
   }, [profiles]);
@@ -904,7 +894,6 @@ Support & Login: https://resellbari.com/login
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="space-y-8 relative">
-          
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden absolute -top-2 -right-2 text-slate-400 hover:text-white p-2 cursor-pointer"
@@ -1192,7 +1181,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 3: RESELLERS (ADMIN ACCOUNTS AUTOMATICALLY HIDDEN) */}
+        {/* TAB 3: RESELLERS */}
         {activeTab === 'resellers' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full shadow-lg">
             <h2 className="text-xl font-bold text-white mb-1">👥 Reseller Management & Seller Hub</h2>
@@ -1410,8 +1399,6 @@ Support & Login: https://resellbari.com/login
         {/* 🛡️ TAB 7: TEAM ACCESS & ROLE PERMISSIONS */}
         {activeTab === 'team' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
-            
-            {/* ADD SUB-ADMIN FORM */}
             <div className="bg-slate-900/60 border border-slate-800 p-6 sm:p-8 rounded-3xl h-fit space-y-5 shadow-lg">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1498,7 +1485,6 @@ Support & Login: https://resellbari.com/login
               </form>
             </div>
 
-            {/* ACTIVE ADMINS & STAFF LIST */}
             <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-lg">
               <div>
                 <h3 className="text-lg font-bold text-white">Active Admin & Staff Users ({staffList.length})</h3>
@@ -1696,21 +1682,218 @@ Support & Login: https://resellbari.com/login
         </div>
       )}
 
-      {/* 🔴 MANAGE ORDER MODAL */}
+      {/* ⚙️ FULL COMPLETE ORDER MANAGEMENT MODAL */}
       {managingOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl w-full max-w-xl space-y-4 shadow-2xl relative my-8">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">⚙️ Order Management</h3>
-              <button onClick={() => setManagingOrder(null)} className="text-slate-400 hover:text-white font-bold">✕</button>
-            </div>
-            <form onSubmit={handleSaveOrderDetails} className="space-y-4">
-              <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={managingOrder.customer_name || ''} onChange={(e) => setManagingOrder({ ...managingOrder, customer_name: e.target.value })} />
-              <input type="text" className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-xs text-white" value={managingOrder.customer_phone || ''} onChange={(e) => setManagingOrder({ ...managingOrder, customer_phone: e.target.value })} />
-              <div className="flex gap-2">
-                <button type="button" onClick={handlePrintInvoice} className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-2xl text-xs">🖨️ Print Invoice</button>
-                <button type="submit" disabled={updateOrderLoading} className="flex-1 bg-emerald-500 text-slate-950 font-bold py-3 rounded-2xl text-xs">💾 Update Order</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl relative my-8 space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">⚙️</span>
+                <div>
+                  <h3 className="text-lg font-black text-white">Order Management</h3>
+                  <span className="text-[11px] font-mono text-slate-400">Order ID: #{managingOrder.id}</span>
+                </div>
               </div>
+              <button 
+                onClick={() => setManagingOrder(null)} 
+                className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 border border-slate-700 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Cancellation Notice if requested */}
+            {managingOrder.status === 'cancel_requested' && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
+                  <span>⚠️</span> Reseller requested cancellation: "{managingOrder.cancel_reason || 'Customer changed mind'}"
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => handleApproveCancel(managingOrder.id)}
+                    className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-xl text-xs transition cursor-pointer"
+                  >
+                    ✓ Approve Cancellation
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const reason = prompt('Enter reason for declining cancel request:');
+                      if (reason) {
+                        setDeclineNoteInput(reason);
+                        handleDeclineCancel(managingOrder.id);
+                      }
+                    }}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 rounded-xl text-xs border border-slate-700 transition cursor-pointer"
+                  >
+                    ✕ Decline Request
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveOrderDetails} className="space-y-4">
+              
+              {/* Customer Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Customer Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                    value={managingOrder.customer_name || ''}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, customer_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Customer Phone
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    value={managingOrder.customer_phone || ''}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, customer_phone: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Address */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                  Delivery Address
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-medium"
+                  value={managingOrder.delivery_address || ''}
+                  onChange={(e) => setManagingOrder({ ...managingOrder, delivery_address: e.target.value })}
+                />
+              </div>
+
+              {/* Product & Price Summary Cards */}
+              <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Product</span>
+                  <strong className="text-slate-200 text-sm">{managingOrder.product_name || 'General Product'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Quantity</span>
+                  <strong className="text-slate-200 text-sm">{managingOrder.quantity || 1} pcs</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Seller Name</span>
+                  <strong className="text-amber-400 text-xs">{managingOrder.seller_name || 'N/A'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Total Amount</span>
+                  <input
+                    type="number"
+                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-bold w-full mt-1"
+                    value={managingOrder.total_amount || 0}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, total_amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Reseller Profit</span>
+                  <input
+                    type="number"
+                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-emerald-400 font-bold w-full mt-1"
+                    value={managingOrder.profit_amount || 0}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, profit_amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Delivery Charge</span>
+                  <input
+                    type="number"
+                    className="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-white font-bold w-full mt-1"
+                    value={managingOrder.delivery_charge || 0}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, delivery_charge: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Status Selectors */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Order Status
+                  </label>
+                  <select
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-bold capitalize"
+                    value={managingOrder.status || 'pending'}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, status: e.target.value })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="picked_up">Picked Up</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="out_for_delivery">Out for Delivery</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="cancel_requested">Cancel Requested</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                    Payout Status
+                  </label>
+                  <select
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer font-bold uppercase"
+                    value={managingOrder.payout_status || 'pending'}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, payout_status: e.target.value })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="hold">Hold</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Payout Hold Reason */}
+              {managingOrder.payout_status === 'hold' && (
+                <div>
+                  <label className="text-xs font-bold text-rose-400 block mb-1 uppercase tracking-wider">
+                    Reason for Holding Payment
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Needs bKash number verification"
+                    className="w-full bg-slate-950 border border-rose-900/60 rounded-xl p-3 text-xs text-rose-300 focus:outline-none"
+                    value={managingOrder.payout_hold_reason || ''}
+                    onChange={(e) => setManagingOrder({ ...managingOrder, payout_hold_reason: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex gap-2.5 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handlePrintInvoice}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-indigo-500/20"
+                >
+                  🖨️ Print Invoice
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateOrderLoading}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-500/20 uppercase tracking-wider"
+                >
+                  {updateOrderLoading ? 'Saving...' : '💾 Update Order'}
+                </button>
+              </div>
+
             </form>
           </div>
         </div>
