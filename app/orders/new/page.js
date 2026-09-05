@@ -11,6 +11,14 @@ export default function CreateOrderPage() {
   const [profile, setProfile] = useState(null);
   const [products, setProducts] = useState([]);
   
+  // Custom Alert / Feedback Modal State
+  const [modalFeedback, setModalFeedback] = useState({
+    show: false,
+    type: 'error', // 'success' | 'error' | 'warning'
+    title: '',
+    message: ''
+  });
+
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -22,7 +30,7 @@ export default function CreateOrderPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [customerNote, setCustomerNote] = useState('');
   
-  // Active Item Being Configured
+  // Active Item Config State
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [itemSellingPrice, setItemSellingPrice] = useState('');
@@ -46,7 +54,6 @@ export default function CreateOrderPage() {
         return;
       }
 
-      // Fetch User Profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -55,7 +62,6 @@ export default function CreateOrderPage() {
       
       setProfile(profileData);
 
-      // Fetch Products
       const { data: productData } = await supabase
         .from('products')
         .select('*')
@@ -67,9 +73,21 @@ export default function CreateOrderPage() {
     }
   }
 
-  // Filter Categories & Sub-Categories dynamically
+  // Trigger Custom Modal
+  const showNotice = (title, message, type = 'error') => {
+    setModalFeedback({ show: true, type, title, message });
+  };
+
+  const closeNotice = () => {
+    const isSuccess = modalFeedback.type === 'success';
+    setModalFeedback({ show: false, type: 'error', title: '', message: '' });
+    if (isSuccess) {
+      router.push('/reseller');
+    }
+  };
+
+  // Categories & Sub-Categories
   const categories = ['all', ...new Set(products.map(p => p.category).filter(Boolean))];
-  
   const availableSubCategories = [
     'all',
     ...new Set(
@@ -80,7 +98,6 @@ export default function CreateOrderPage() {
     )
   ];
 
-  // Filtered Products list
   const filteredProducts = products.filter(p => {
     const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
     const matchesSubCategory = selectedSubCategory === 'all' || p.sub_category === selectedSubCategory;
@@ -88,25 +105,26 @@ export default function CreateOrderPage() {
     return matchesCategory && matchesSubCategory && matchesSearch;
   });
 
-  // Select Product to prepare for adding
   const handleSelectProduct = (product) => {
     setSelectedProduct(product);
     setQuantity(1);
     setItemSellingPrice(product.suggested_price || product.price);
   };
 
-  // ➕ Add Product to Cart / Sale
+  // ➕ Add Product to Sale
   const handleAddProductToSale = () => {
-    if (!selectedProduct) return alert('অনুগ্রহ করে আগে একটি প্রোডাক্ট সিলেক্ট করুন!');
+    if (!selectedProduct) {
+      return showNotice('Product Missing', 'Please select a product from the list first.', 'warning');
+    }
     
     const qty = Number(quantity);
     const unitSellPrice = Number(itemSellingPrice);
 
-    if (qty < 1) return alert('কমপক্ষে ১টি কোয়ান্টিটি দিন');
-    if (!unitSellPrice || unitSellPrice < Number(selectedProduct.price)) {
-      if (!confirm(`আপনার সেলিং প্রাইস (${unitSellPrice}৳) বেস পাইকারি মূল্যের (${selectedProduct.price}৳) চেয়ে কম। আপনি কি নিশ্চিত?`)) {
-        return;
-      }
+    if (qty < 1) {
+      return showNotice('Invalid Quantity', 'Quantity must be at least 1.', 'warning');
+    }
+    if (!unitSellPrice || unitSellPrice <= 0) {
+      return showNotice('Invalid Selling Price', 'Please enter a valid customer selling price.', 'warning');
     }
 
     const newItem = {
@@ -122,35 +140,31 @@ export default function CreateOrderPage() {
     };
 
     setOrderItems(prev => [...prev, newItem]);
-    
-    // Reset product selection for adding next product
     setSelectedProduct(null);
     setQuantity(1);
     setItemSellingPrice('');
   };
 
-  // ❌ Remove Item from Cart
   const handleRemoveItem = (index) => {
     setOrderItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  // 🧮 Summary Calculations for Multi-Products
   const totalWholesalePrice = orderItems.reduce((acc, item) => acc + item.total_base, 0);
   const totalSellingPrice = orderItems.reduce((acc, item) => acc + item.total_selling, 0);
   const totalProfit = orderItems.reduce((acc, item) => acc + item.profit, 0);
   const totalCustomerBill = Math.max(0, totalSellingPrice + Number(deliveryCharge) - Number(discount));
 
-  // 🚀 Place Order
+  // 🚀 Submit Order
   async function handleSubmitOrder(e) {
     e.preventDefault();
+
     if (orderItems.length === 0) {
-      return alert('অনুগ্রহ করে কমপক্ষে একটি প্রোডাক্ট সেলে যুক্ত করুন (+ Add Product to Sale এ ক্লিক করুন)!');
+      return showNotice('No Products Added', 'Please select a product and click "+ Add Product to Sale" first.', 'warning');
     }
     
-    // 11 Digit Phone Validation
     const cleanPhone = customerPhone.trim();
     if (!/^01[3-9]\d{8}$/.test(cleanPhone)) {
-      return alert('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)');
+      return showNotice('Invalid Phone Number', 'Please enter a valid 11-digit Bangladeshi mobile number (e.g. 017XXXXXXXX).', 'warning');
     }
 
     setLoading(true);
@@ -170,7 +184,7 @@ export default function CreateOrderPage() {
           reseller_id: user?.id,
           product_id: orderItems[0].product_id,
           product_name: primaryProductName,
-          order_items: orderItems, // সম্পূর্ণ মাল্টি-প্রোডাক্ট ডিটেইলস
+          order_items: orderItems,
           customer_name: customerName,
           customer_phone: cleanPhone,
           delivery_address: deliveryAddress,
@@ -189,20 +203,19 @@ export default function CreateOrderPage() {
       ]);
 
       if (!error) {
-        alert('অর্ডারটি সফলভাবে প্লেস করা হয়েছে!');
-        router.push('/reseller');
+        showNotice('Order Created Successfully!', 'Your customer order has been placed and sent to administration for delivery.', 'success');
       } else {
-        alert('Error placing order: ' + error.message);
+        showNotice('Order Creation Failed', error.message, 'error');
       }
     } catch (err) {
-      alert('Order Error: ' + err.message);
+      showNotice('Order Exception', err.message, 'error');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 p-4 sm:p-8 font-sans">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 p-4 sm:p-8 font-sans relative">
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Top Bar */}
@@ -277,7 +290,6 @@ export default function CreateOrderPage() {
               </div>
             </div>
 
-            {/* Delivery & Discount Configurations */}
             <div className="pt-4 border-t border-slate-800 grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-slate-400 block mb-1">Delivery Charge (৳)</label>
@@ -436,7 +448,7 @@ export default function CreateOrderPage() {
               )}
             </div>
 
-            {/* Step 3: Current Order Items Cart (Multiple Products Table) */}
+            {/* Step 3: Current Order Items Cart */}
             <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-4">
               <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                 <h3 className="text-base font-bold text-white">2. Selected Order Products ({orderItems.length})</h3>
@@ -471,7 +483,7 @@ export default function CreateOrderPage() {
                         <button 
                           type="button" 
                           onClick={() => handleRemoveItem(idx)}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
                           title="Remove item"
                         >
                           ✕
@@ -512,7 +524,7 @@ export default function CreateOrderPage() {
                 </div>
               </div>
 
-              {/* Submit Final Multi-Product Order */}
+              {/* Submit Button */}
               <button 
                 type="submit" 
                 disabled={loading || orderItems.length === 0}
@@ -530,6 +542,49 @@ export default function CreateOrderPage() {
 
         </form>
       </div>
+
+      {/* 🌟 PROFESSIONAL CUSTOM MODAL NOTIFICATION (NO BROWSER ALERT) 🌟 */}
+      {modalFeedback.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl space-y-5">
+            
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl shadow-lg ${
+              modalFeedback.type === 'success' 
+                ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 shadow-emerald-500/30' 
+                : modalFeedback.type === 'warning'
+                ? 'bg-amber-500/20 border-2 border-amber-500 text-amber-400 shadow-amber-500/30'
+                : 'bg-rose-500/20 border-2 border-rose-500 text-rose-400 shadow-rose-500/30'
+            }`}>
+              {modalFeedback.type === 'success' ? '✓' : modalFeedback.type === 'warning' ? '⚠️' : '✕'}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-white">
+                {modalFeedback.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {modalFeedback.message}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={closeNotice}
+                className={`w-full font-black py-3.5 rounded-2xl text-xs uppercase tracking-wider transition shadow-lg cursor-pointer ${
+                  modalFeedback.type === 'success'
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25'
+                    : 'bg-slate-800 hover:bg-slate-700 text-white'
+                }`}
+              >
+                {modalFeedback.type === 'success' ? 'Go to Dashboard' : 'Understood'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
