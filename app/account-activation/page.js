@@ -133,6 +133,7 @@ export default function AccountActivationPage() {
 
   const [timeLeft, setTimeLeft] = useState(1800);
 
+  // 🛡️ অটোমেটেড মেম্বারশিপ চেক ও রিডাইরেক্ট গার্ড (যেকোনো একটিভ ইউজার ড্যাশবোর্ডে চলে যাবে)
   useEffect(() => {
     async function checkUserAndMembership() {
       try {
@@ -142,20 +143,60 @@ export default function AccountActivationPage() {
         } = await supabase.auth.getSession();
 
         if (sessionError || !session) {
-          router.push("/login");
+          router.replace("/login");
           return;
         }
 
-        setUser(session.user);
+        const currentUser = session.user;
+        setUser(currentUser);
 
+        // ১. অ্যাডমিনদের সরাসরি অ্যাডমিন প্যানেলে পাঠানো
+        const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com', 'info.resellbari@gmail.com'];
+        if (SUPER_ADMINS.includes(currentUser.email?.toLowerCase())) {
+          router.replace("/admin");
+          return;
+        }
+
+        // ২. প্রোফাইল স্ট্যাটাস চেক
         const { data: profile } = await supabase
           .from("profiles")
-          .select("plan, status")
-          .eq("id", session.user.id)
-          .single();
+          .select("role, plan, status")
+          .eq("id", currentUser.id)
+          .maybeSingle();
 
-        if (profile && profile.plan && profile.plan.toLowerCase() !== "basic") {
-          router.push("/reseller");
+        if (profile?.role === "admin") {
+          router.replace("/admin");
+          return;
+        }
+
+        // ৩. রিকোয়েস্টে অলরেডি অনুমোদিত (approved) আছে কিনা চেক
+        const { data: approvedReq } = await supabase
+          .from("activation_requests")
+          .select("status, plan")
+          .or(`user_id.eq.${currentUser.id},email.eq.${currentUser.email}`)
+          .eq("status", "approved")
+          .limit(1)
+          .maybeSingle();
+
+        const validPlans = ["basic", "advance", "premium"];
+        const hasValidPlan = profile?.plan && validPlans.includes(profile.plan.toLowerCase());
+        const isProfileActive = profile?.status === "active";
+
+        // ✅ অনুমোদিত রিসেলার হলে সাথে সাথে ড্যাশবোর্ডে রিডাইরেক্ট
+        if ((hasValidPlan && isProfileActive) || approvedReq) {
+          if (!isProfileActive && approvedReq) {
+            const rawPlan = approvedReq.plan?.toLowerCase() || "basic";
+            let cleanPlan = "basic";
+            if (rawPlan.includes("advance")) cleanPlan = "advance";
+            else if (rawPlan.includes("premium")) cleanPlan = "premium";
+
+            await supabase
+              .from("profiles")
+              .update({ plan: cleanPlan, status: "active", updated_at: new Date() })
+              .eq("id", currentUser.id);
+          }
+
+          router.replace("/reseller");
           return;
         }
       } catch (err) {
@@ -167,6 +208,47 @@ export default function AccountActivationPage() {
 
     checkUserAndMembership();
   }, [router]);
+
+  // 🔴 রিয়েল-টাইম লিসেনার: ইউজার অপেক্ষা করার সময় অ্যাডমিন প্যানেল থেকে Approve হলে স্বয়ংক্রিয় রিডাইরেক্ট
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("user-activation-live-sync")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "activation_requests",
+          filter: `email=eq.${user.email}`,
+        },
+        (payload) => {
+          if (payload.new && payload.new.status === "approved") {
+            router.replace("/reseller");
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.new && payload.new.status === "active" && payload.new.plan) {
+            router.replace("/reseller");
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, router]);
 
   useEffect(() => {
     let timer;
@@ -203,19 +285,19 @@ export default function AccountActivationPage() {
       const { error } = await supabase.from("activation_requests").insert([
         {
           user_id: user?.id,
-          email: user?.email,
+          email: user?.email?.trim()?.toLowerCase(),
           plan: selectedPlan?.name,
           amount: selectedPlan?.price,
           payment_method: method,
           phone_number: phoneNumber,
-          transaction_id: transactionId,
+          transaction_id: transactionId.trim(),
           status: "pending",
           created_at: new Date().toISOString(),
         },
       ]);
 
       if (error) {
-        console.log("Payment info submitted locally or Supabase table pending.");
+        console.error("Supabase insert warning:", error);
       }
 
       setIsSubmitted(true);
@@ -231,7 +313,7 @@ export default function AccountActivationPage() {
     return (
       <div className="font-body min-h-screen bg-stone-50 flex items-center justify-center">
         <style>{FONT_STYLES}</style>
-        <div className="text-emerald-900 animate-pulse text-base font-medium">Loading activation details...</div>
+        <div className="text-emerald-900 animate-pulse text-base font-medium">Checking membership details...</div>
       </div>
     );
   }
@@ -384,7 +466,7 @@ export default function AccountActivationPage() {
                       type="button"
                       onClick={() => handlePlanSelect(p.key, p.price)}
                       className={
-                        "mt-6 text-center font-medium text-base px-5 py-3.5 rounded-md transition-colors " +
+                        "mt-6 text-center font-medium text-base px-5 py-3.5 rounded-md transition-colors cursor-pointer " +
                         (p.featured ? "bg-amber-500 text-emerald-950 hover:bg-amber-400" : accent.cta)
                       }
                     >
@@ -452,7 +534,7 @@ export default function AccountActivationPage() {
             {!isSubmitted && (
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="absolute top-5 right-5 text-stone-400 hover:text-stone-600 transition-colors"
+                className="absolute top-5 right-5 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer"
                 aria-label="Close"
               >
                 <X size={22} />
@@ -477,7 +559,7 @@ export default function AccountActivationPage() {
                     <button
                       type="button"
                       onClick={handleCopyNumber}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 text-stone-50 rounded-md text-sm font-medium transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 text-stone-50 rounded-md text-sm font-medium transition-colors cursor-pointer"
                     >
                       {copied ? (
                         <>
@@ -506,7 +588,7 @@ export default function AccountActivationPage() {
                   <select
                     value={method}
                     onChange={(e) => setMethod(e.target.value)}
-                    className="w-full bg-white border border-stone-300 text-stone-800 rounded-md px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                    className="w-full bg-white border border-stone-300 text-stone-800 rounded-md px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-700 cursor-pointer"
                   >
                     <option value="bKash">bKash</option>
                     <option value="Nagad">Nagad</option>
@@ -547,14 +629,14 @@ export default function AccountActivationPage() {
                     type="file"
                     accept="image/*"
                     onChange={(e) => setScreenshot(e.target.files[0])}
-                    className="w-full text-sm text-stone-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-800 hover:file:bg-emerald-100"
+                    className="w-full text-sm text-stone-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-800 hover:file:bg-emerald-100 cursor-pointer"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full bg-emerald-950 hover:bg-emerald-900 text-stone-50 font-medium text-base py-3.5 rounded-md transition-colors disabled:opacity-50"
+                  className="w-full bg-emerald-950 hover:bg-emerald-900 text-stone-50 font-medium text-base py-3.5 rounded-md transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? "Submitting details..." : "Submit Payment"}
                 </button>
@@ -578,12 +660,12 @@ export default function AccountActivationPage() {
                 </div>
 
                 <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-sm sm:text-base text-emerald-800 leading-relaxed">
-                  সম্পন্ন হলে আপনি email-এ Dashboard link পাবেন।
+                  পেমেন্ট অ্যাপ্রুভ হওয়ার সাথে সাথেই আপনি অটোমেটিক ড্যাশবোর্ডে প্রবেশ করবেন।
                 </div>
 
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="text-sm text-stone-400 hover:text-stone-600 underline transition-colors"
+                  className="text-sm text-stone-400 hover:text-stone-600 underline transition-colors cursor-pointer"
                 >
                   Close Window
                 </button>
