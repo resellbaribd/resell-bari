@@ -93,31 +93,62 @@ export default function ResellerDashboard() {
         return;
       }
 
-      const { data: profileData } = await supabase
+      // ১. প্রোফাইল ডাটা আনা
+      let { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
-      // 🛡️ STRICT MEMBERSHIP GATEKEEPER GUARD:
-      // অ্যাডমিন বাদে যেসকল ইউজারের ভ্যালিড প্ল্যান নেই অথবা স্ট্যাটাস active নয়, তাদের সরাসরি /account-activation এ পাঠানো হবে
-      if (profileData) {
-        const validPlans = ['basic', 'advance', 'premium'];
-        const userPlan = profileData?.plan ? profileData.plan.toLowerCase().trim() : null;
-        const hasValidPlan = userPlan && validPlans.includes(userPlan);
-        const isActive = profileData?.status === 'active';
-        const isAdmin = profileData?.role?.toLowerCase() === 'admin';
+      const userEmail = (user.email || '').toLowerCase();
+      const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com', 'info.resellbari@gmail.com'];
+      const isAdmin = SUPER_ADMINS.includes(userEmail) || profileData?.role?.toLowerCase() === 'admin';
 
-        if (!isAdmin && (!hasValidPlan || !isActive)) {
+      if (!isAdmin) {
+        // ২. 🛡️ LOOP BREAKER: activation_requests-এ approved আছে কি না চেক
+        const { data: approvedReq } = await supabase
+          .from('activation_requests')
+          .select('status, plan')
+          .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
+          .eq('status', 'approved')
+          .limit(1)
+          .maybeSingle();
+
+        const validPlans = ['basic', 'advance', 'premium'];
+        const currentPlanName = profileData?.plan ? profileData.plan.toLowerCase().trim() : null;
+        const hasValidPlan = currentPlanName && validPlans.includes(currentPlanName);
+        const isActive = profileData?.status === 'active';
+
+        // যদি approved রিকোয়েস্ট থাকে কিন্তু প্রোফাইল এখনও পেন্ডিং, তবে প্রোফাইলটি অটোমেটিক একটিভ করে এখানেই ড্যাশবোর্ডে ধরে রাখা হবে
+        if ((!hasValidPlan || !isActive) && approvedReq) {
+          const rawPlan = approvedReq.plan?.toLowerCase() || 'basic';
+          let cleanPlan = 'basic';
+          if (rawPlan.includes('advance')) cleanPlan = 'advance';
+          else if (rawPlan.includes('premium')) cleanPlan = 'premium';
+
+          await supabase
+            .from('profiles')
+            .update({
+              plan: cleanPlan,
+              status: 'active',
+              updated_at: new Date()
+            })
+            .eq('id', user.id);
+
+          profileData = {
+            ...profileData,
+            plan: cleanPlan,
+            status: 'active'
+          };
+        } 
+        // যদি পেমেন্ট রিকোয়েস্টও approved না থাকে এবং প্রোফাইলও active না থাকে, শুধুমাত্র তখনই অ্যাক্টিভেশন পেজে রিডাইরেক্ট করবে
+        else if (!hasValidPlan || !isActive) {
           router.replace('/account-activation');
           return;
         }
-
-        setProfile(profileData);
-      } else {
-        router.replace('/account-activation');
-        return;
       }
+
+      setProfile(profileData);
 
       const { data: ordersData } = await supabase
         .from('orders')
