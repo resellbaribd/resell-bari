@@ -36,7 +36,7 @@ export default function AdminDashboard() {
   const [uploading, setUploading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
 
-  // Product Form (Added brand & newBrandInput)
+  // Product Form (Added description state)
   const [newProduct, setNewProduct] = useState({ 
     title: '', 
     brand: '',
@@ -607,12 +607,11 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  // 🌟 Add Product (With Brand support)
+  // 🌟 Add Product (With Brand and Description Support)
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
     
-    // ব্র্যান্ড নির্ধারণ
     const finalBrand = newBrandInput.trim() !== '' ? newBrandInput.trim() : (newProduct.brand || null);
 
     setUploading(true);
@@ -626,9 +625,9 @@ Support & Login: https://resellbari.com/login
         suggested_price: Number(newProduct.suggested_price) || 0,
         category: newProduct.category || null,
         sub_category: newProduct.sub_category || null,
+        description: newProduct.description || null,
         image_url: imageList[0],
         images: imageList,
-        description: newProduct.description || null,
         stock: Number(newProduct.stock) || 0
       }]);
 
@@ -653,7 +652,7 @@ Support & Login: https://resellbari.com/login
     else alert('Error: ' + error.message);
   }
 
-  // 🌟 Update Product (Modal Save)
+  // 🌟 Update Product (With Description)
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -670,9 +669,9 @@ Support & Login: https://resellbari.com/login
         suggested_price: Number(editingProduct.suggested_price) || 0,
         category: editingProduct.category || null,
         sub_category: editingProduct.sub_category || null,
+        description: editingProduct.description || null,
         image_url: finalImages[0] || null,
         images: finalImages,
-        description: editingProduct.description || null,
         stock: Number(editingProduct.stock) || 0
       }).eq('id', editingProduct.id);
 
@@ -1427,7 +1426,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 5: INVENTORY (WITH DYNAMIC BRAND SYSTEM) */}
+        {/* TAB 5: INVENTORY (WITH DESCRIPTION & BRAND) */}
         {activeTab === 'inventory' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
             <div className="bg-slate-900/60 border border-slate-800 p-6 sm:p-8 rounded-3xl h-fit shadow-lg space-y-5">
@@ -1445,7 +1444,7 @@ Support & Login: https://resellbari.com/login
                   />
                 </div>
 
-                {/* 🏷️ BRAND SELECTION & CREATION */}
+                {/* Brand Selection */}
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Brand Name</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1455,7 +1454,7 @@ Support & Login: https://resellbari.com/login
                         setNewProduct({ ...newProduct, brand: e.target.value });
                         if (e.target.value !== 'other') setNewBrandInput('');
                       }}
-                      className="w-full bg-slate-800 border border-slate-700 text-xs text-white p-3 rounded-2xl focus:outline-none"
+                      className="w-full bg-slate-800 border border-slate-700 text-xs text-white p-3 rounded-2xl focus:outline-none cursor-pointer"
                     >
                       <option value="">Select Existing Brand</option>
                       {availableBrands.map((b, i) => (
@@ -1488,14 +1487,26 @@ Support & Login: https://resellbari.com/login
                   </div>
                 </div>
 
+                {/* 📝 PRODUCT DESCRIPTION / DETAILS (ADDED) */}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Product Description / Details</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Write product specifications, benefits, usage instructions..."
+                    className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                    value={newProduct.description}
+                    onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Base Price (৳) *</label>
-                    <input type="number" required placeholder="Base Price" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.base_price} onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} />
+                    <input type="number" required placeholder="Base Price" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white font-bold" value={newProduct.base_price} onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} />
                   </div>
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">Suggested Price (৳) *</label>
-                    <input type="number" required placeholder="Suggested Price" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.suggested_price} onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} />
+                    <input type="number" required placeholder="Suggested Price" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white font-bold" value={newProduct.suggested_price} onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} />
                   </div>
                 </div>
 
@@ -1764,7 +1775,7 @@ Support & Login: https://resellbari.com/login
 
       </main>
 
-      {/* ✏️ EDIT PRODUCT MODAL (Restored & Functional with Brand) */}
+      {/* ✏️ EDIT PRODUCT MODAL (WITH DESCRIPTION & BRAND) */}
       <AnimatePresence>
         {editingProduct && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
@@ -1863,6 +1874,17 @@ Support & Login: https://resellbari.com/login
                       onChange={(e) => setEditingProduct({ ...editingProduct, sub_category: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* 📝 PRODUCT DESCRIPTION EDIT (ADDED) */}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Product Description / Details</label>
+                  <textarea 
+                    rows={3}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    value={editingProduct.description || ''}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                  />
                 </div>
 
                 <div>
