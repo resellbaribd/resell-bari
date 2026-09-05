@@ -64,19 +64,45 @@ export default function LoginPage() {
         return;
       }
 
-      // ৩. 🛡️ STRICT MEMBERSHIP CHECK: ভ্যালিড প্ল্যান ও একটিভ স্ট্যাটাস না থাকলে সরাসরি /account-activation এ পাঠাবে
+      // ৩. 🛡️ অটোমেটেড ডুয়াল চেক: activation_requests টেবিলে পেমেন্ট কনফার্মড আছে কিনা
+      const { data: approvedReq } = await supabase
+        .from('activation_requests')
+        .select('status, plan')
+        .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
+        .eq('status', 'approved')
+        .limit(1)
+        .maybeSingle();
+
       const validPlans = ['basic', 'advance', 'premium'];
       const userPlan = profileData?.plan ? profileData.plan.toLowerCase().trim() : null;
-      const hasValidPlan = userPlan && validPlans.includes(userPlan);
-      const isActive = profileData?.status === 'active';
+      const hasValidProfilePlan = userPlan && validPlans.includes(userPlan);
+      const isProfileActive = profileData?.status === 'active';
 
-      if (!hasValidPlan || !isActive) {
-        setSuccessModal({ show: true, targetUrl: '/account-activation' });
+      // ইউজার প্রোফাইলে অথবা পেমেন্ট রিকোয়েস্টে approved হলে
+      if ((hasValidProfilePlan && isProfileActive) || approvedReq) {
+        // যদি প্রোফাইলে এখনও pending থেকে থাকে, সাথে সাথে ফ্রন্টএন্ড থেকেও sync করে দেওয়া
+        if (!isProfileActive && approvedReq) {
+          const rawPlan = approvedReq.plan?.toLowerCase() || 'basic';
+          let planName = 'basic';
+          if (rawPlan.includes('advance')) planName = 'advance';
+          else if (rawPlan.includes('premium')) planName = 'premium';
+
+          await supabase
+            .from('profiles')
+            .update({
+              plan: planName,
+              status: 'active',
+              updated_at: new Date()
+            })
+            .eq('id', user.id);
+        }
+
+        setSuccessModal({ show: true, targetUrl: '/reseller' });
         return;
       }
 
-      // ৪. শুধুমাত্র ভেরিফাইড পেইড রিসেলার ড্যাশবোর্ডে ঢুকবে
-      setSuccessModal({ show: true, targetUrl: '/reseller' });
+      // ৪. মেম্বারশিপ নিশ্চিত না হলে সরাসরি /account-activation এ পাঠাবে
+      setSuccessModal({ show: true, targetUrl: '/account-activation' });
     } catch (err) {
       setErrorMsg(err.message || 'Login failed. Please check your credentials.');
     } finally {
