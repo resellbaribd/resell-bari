@@ -36,9 +36,10 @@ export default function AdminDashboard() {
   const [uploading, setUploading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
 
-  // Product Form
+  // Product Form (Added brand & newBrandInput)
   const [newProduct, setNewProduct] = useState({ 
     title: '', 
+    brand: '',
     base_price: '', 
     suggested_price: '', 
     category: '', 
@@ -46,7 +47,9 @@ export default function AdminDashboard() {
     description: '', 
     stock: 10 
   });
+  const [newBrandInput, setNewBrandInput] = useState('');
   
+  // Product Edit States
   const [editingProduct, setEditingProduct] = useState(null);
   const [editMediaFiles, setEditMediaFiles] = useState([]);
   const [editUploading, setEditUploading] = useState(false);
@@ -155,7 +158,12 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🛡️ Staff / Sub-Admin Creation
+  // ডাইনামিক ব্র্যান্ড তালিকা
+  const availableBrands = useMemo(() => {
+    return Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
+  }, [products]);
+
+  // 🛡️ Staff Creation
   async function handleCreateStaff(e) {
     e.preventDefault();
     if (!staffForm.email || !staffForm.password) return alert('Email & password are required');
@@ -234,7 +242,7 @@ export default function AdminDashboard() {
     }
   }
 
-  // 💳 Payment Actions (Dual UID + Email Sync)
+  // 💳 Payment Actions
   async function handleApprovePayment(request) {
     if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
     setPaymentActionLoading(request.id);
@@ -599,23 +607,21 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  async function handlePayoutUpdate(orderId, newPayoutStatus) {
-    const reason = holdReasons[orderId] || '';
-    const { error } = await supabase.from('orders').update({ payout_status: newPayoutStatus, payout_hold_reason: newPayoutStatus === 'hold' ? reason : null, updated_at: new Date() }).eq('id', orderId);
-    if (!error) setOrders(orders.map(o => o.id === orderId ? { ...o, payout_status: newPayoutStatus, payout_hold_reason: newPayoutStatus === 'hold' ? reason : null } : o));
-    else alert('Error: ' + error.message);
-  }
-
-  // Product Handlers
+  // 🌟 Add Product (With Brand support)
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
+    
+    // ব্র্যান্ড নির্ধারণ
+    const finalBrand = newBrandInput.trim() !== '' ? newBrandInput.trim() : (newProduct.brand || null);
+
     setUploading(true);
     try {
       const imageList = await Promise.all(mediaFiles.map(file => handleFileConvert(file)));
       
       const { error } = await supabase.from('products').insert([{
         name: newProduct.title,
+        brand: finalBrand,
         price: Number(newProduct.base_price) || 0,
         suggested_price: Number(newProduct.suggested_price) || 0,
         category: newProduct.category || null,
@@ -628,7 +634,8 @@ Support & Login: https://resellbari.com/login
 
       if (!error) {
         alert('Product successfully saved to Inventory!');
-        setNewProduct({ title: '', base_price: '', suggested_price: '', category: '', sub_category: '', description: '', stock: 10 });
+        setNewProduct({ title: '', brand: '', base_price: '', suggested_price: '', category: '', sub_category: '', description: '', stock: 10 });
+        setNewBrandInput('');
         setMediaFiles([]);
         fetchAdminData();
       } else alert('Error adding product: ' + error.message);
@@ -646,6 +653,7 @@ Support & Login: https://resellbari.com/login
     else alert('Error: ' + error.message);
   }
 
+  // 🌟 Update Product (Modal Save)
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -657,6 +665,7 @@ Support & Login: https://resellbari.com/login
 
       const { error } = await supabase.from('products').update({
         name: editingProduct.name || editingProduct.title,
+        brand: editingProduct.brand || null,
         price: Number(editingProduct.price ?? editingProduct.base_price) || 0,
         suggested_price: Number(editingProduct.suggested_price) || 0,
         category: editingProduct.category || null,
@@ -668,6 +677,7 @@ Support & Login: https://resellbari.com/login
       }).eq('id', editingProduct.id);
 
       if (!error) { 
+        alert('Product updated successfully!');
         setEditingProduct(null); 
         setEditMediaFiles([]); 
         fetchAdminData(); 
@@ -793,7 +803,6 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 🗑️ Permanent Delete Seller Profile
   async function handleDeleteSellerProfile(sellerId, sellerName) {
     if (!confirm(`⚠️ PERMANENT TERMINATION WARNING:\n\nAre you sure you want to completely delete reseller "${sellerName}"?\nThis will remove their profile and store settings from the system permanently.`)) return;
     
@@ -815,13 +824,12 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 👥 Filter & Map Full Reseller Profiles (NO FAKE BKASH FALLBACK)
+  // 👥 Filter & Map Full Reseller Profiles
   const sellersList = useMemo(() => {
     const sellerMap = {};
     profiles
       .filter(p => p.role !== 'admin' && !SUPER_ADMINS.includes(p.email?.toLowerCase()))
       .forEach(p => {
-        // শুধুমাত্র আসল ওয়ালেট তথ্য থাকলে দেখাবে, অন্যথায় 'Unset'
         const hasCustomWallet = !!p.payment_method;
         const walletMethod = p.payment_method || 'Unset';
         const rawWalletNum = p.account_number || p.bkash_number || p.payment_number || '';
@@ -1122,7 +1130,7 @@ Support & Login: https://resellbari.com/login
                       <defs>
                         <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
@@ -1217,7 +1225,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 3: RESELLERS (COMPLETE PROFILE DATA + BAN + TERMINATE) */}
+        {/* TAB 3: RESELLERS */}
         {activeTab === 'resellers' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full shadow-lg">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -1249,8 +1257,6 @@ Support & Login: https://resellbari.com/login
                     sellersList.map((seller, idx) => (
                       <tr key={seller.id} className={`hover:bg-slate-800/20 transition ${seller.is_banned ? 'bg-rose-950/20' : ''}`}>
                         <td className="p-4 font-mono font-bold text-emerald-400 text-sm">#{idx + 1}</td>
-                        
-                        {/* Seller & Business Info */}
                         <td className="p-4">
                           <div className="font-bold text-white text-sm flex items-center gap-2">
                             {seller.name}
@@ -1259,7 +1265,6 @@ Support & Login: https://resellbari.com/login
                           <div className="text-slate-300 text-xs mt-0.5">{seller.email}</div>
                           <div className="text-emerald-400 font-mono text-[11px] mt-0.5">📞 {seller.phone}</div>
                           
-                          {/* Store / Facebook Link */}
                           {seller.facebook_page && seller.facebook_page !== 'N/A' && (
                             <div className="mt-1 text-[11px]">
                               <span className="text-slate-400">FB / Shop: </span>
@@ -1277,14 +1282,10 @@ Support & Login: https://resellbari.com/login
                             </div>
                           )}
                         </td>
-
-                        {/* Location */}
                         <td className="p-4">
                           <div className="font-bold text-slate-200">{seller.district || 'Unset'}</div>
                           <div className="text-slate-400 text-[11px] mt-0.5 max-w-xs truncate">{seller.address || 'Address not provided'}</div>
                         </td>
-
-                        {/* Membership */}
                         <td className="p-4">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase ${
                             seller.plan ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
@@ -1293,8 +1294,6 @@ Support & Login: https://resellbari.com/login
                           </span>
                           <div className="text-[10px] text-slate-500 mt-1 capitalize">Status: {seller.status}</div>
                         </td>
-
-                        {/* Payout Method (Real custom wallet only) */}
                         <td className="p-4">
                           {seller.has_wallet ? (
                             <div className="flex items-center gap-2">
@@ -1307,8 +1306,6 @@ Support & Login: https://resellbari.com/login
                             <span className="text-slate-500 italic">Unset / Not Added</span>
                           )}
                         </td>
-
-                        {/* Actions (View + Ban + Terminate) */}
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button 
@@ -1430,24 +1427,91 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 5: INVENTORY */}
+        {/* TAB 5: INVENTORY (WITH DYNAMIC BRAND SYSTEM) */}
         {activeTab === 'inventory' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
-            <div className="bg-slate-900/60 border border-slate-800 p-6 sm:p-8 rounded-3xl h-fit shadow-lg">
-              <h3 className="text-lg font-bold text-white mb-6">➕ Add New Product</h3>
+            <div className="bg-slate-900/60 border border-slate-800 p-6 sm:p-8 rounded-3xl h-fit shadow-lg space-y-5">
+              <h3 className="text-lg font-bold text-white">➕ Add New Product</h3>
               <form onSubmit={handleAddProduct} className="space-y-4">
-                <input type="text" required placeholder="Product Title" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.title} onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} />
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Category" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} />
-                  <input type="text" placeholder="Sub-Category" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.sub_category} onChange={(e) => setNewProduct({ ...newProduct, sub_category: e.target.value })} />
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Product Title *</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Product Title" 
+                    className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white focus:outline-none focus:border-emerald-500" 
+                    value={newProduct.title} 
+                    onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} 
+                  />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="number" required placeholder="Base Price (৳)" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.base_price} onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} />
-                  <input type="number" required placeholder="Suggested Price (৳)" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.suggested_price} onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} />
+
+                {/* 🏷️ BRAND SELECTION & CREATION */}
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Brand Name</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={newProduct.brand}
+                      onChange={(e) => {
+                        setNewProduct({ ...newProduct, brand: e.target.value });
+                        if (e.target.value !== 'other') setNewBrandInput('');
+                      }}
+                      className="w-full bg-slate-800 border border-slate-700 text-xs text-white p-3 rounded-2xl focus:outline-none"
+                    >
+                      <option value="">Select Existing Brand</option>
+                      {availableBrands.map((b, i) => (
+                        <option key={i} value={b}>{b}</option>
+                      ))}
+                      <option value="other">+ Type New Brand</option>
+                    </select>
+
+                    <input 
+                      type="text" 
+                      placeholder="Or type new brand..."
+                      className="w-full bg-slate-800 border border-slate-700 text-xs text-white p-3 rounded-2xl focus:outline-none focus:border-emerald-500" 
+                      value={newBrandInput}
+                      onChange={(e) => {
+                        setNewBrandInput(e.target.value);
+                        setNewProduct({ ...newProduct, brand: '' });
+                      }}
+                    />
+                  </div>
                 </div>
-                <input type="file" multiple accept="image/*" onChange={(e) => handleMultipleFilesChange(e, false)} className="w-full text-xs text-slate-400 cursor-pointer" />
-                <button type="submit" disabled={uploading} className="w-full bg-emerald-500 text-slate-950 font-bold py-4 rounded-2xl text-xs cursor-pointer">
-                  {uploading ? 'Processing...' : '+ Save Product to Inventory'}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Category</label>
+                    <input type="text" placeholder="e.g. Skin Care" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Sub-Category</label>
+                    <input type="text" placeholder="e.g. Cream" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.sub_category} onChange={(e) => setNewProduct({ ...newProduct, sub_category: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Base Price (৳) *</label>
+                    <input type="number" required placeholder="Base Price" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.base_price} onChange={(e) => setNewProduct({ ...newProduct, base_price: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Suggested Price (৳) *</label>
+                    <input type="number" required placeholder="Suggested Price" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.suggested_price} onChange={(e) => setNewProduct({ ...newProduct, suggested_price: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Stock Quantity</label>
+                    <input type="number" placeholder="10" className="w-full bg-slate-800 p-3.5 rounded-2xl text-xs text-white" value={newProduct.stock} onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Product Images *</label>
+                    <input type="file" multiple accept="image/*" onChange={(e) => handleMultipleFilesChange(e, false)} className="w-full text-xs text-slate-400 cursor-pointer pt-2" />
+                  </div>
+                </div>
+
+                <button type="submit" disabled={uploading} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-2xl text-xs cursor-pointer transition shadow-lg shadow-emerald-500/20">
+                  {uploading ? 'Processing & Saving...' : '+ Save Product to Inventory'}
                 </button>
               </form>
             </div>
@@ -1455,17 +1519,38 @@ Support & Login: https://resellbari.com/login
             <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-lg">
               <h3 className="text-lg font-bold text-white mb-4">Inventory Catalogue ({products.length})</h3>
               {products.map((p) => (
-                <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center">
+                <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center hover:border-slate-700 transition">
                   <div className="flex items-center gap-4">
                     <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover" alt="" />
                     <div>
-                      <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
-                      <p className="text-xs text-slate-400">Base: ৳{p.price} | Stock: {p.stock || 0}</p>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
+                        {p.brand && (
+                          <span className="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold">
+                            {p.brand}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Base: ৳{p.price} | Sugg: ৳{p.suggested_price || p.price} | Stock: <strong className={p.stock <= 5 ? 'text-rose-400' : 'text-slate-200'}>{p.stock || 0}</strong>
+                      </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setEditingProduct(p)} className="px-3.5 py-2 bg-slate-800 text-amber-400 rounded-xl text-xs font-bold">✏️ Edit</button>
-                    <button onClick={() => handleDeleteProduct(p.id, p.name || p.title)} className="px-3.5 py-2 bg-rose-500/10 text-rose-400 rounded-xl text-xs font-bold">🗑️</button>
+                    <button 
+                      type="button"
+                      onClick={() => setEditingProduct(p)} 
+                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 cursor-pointer"
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => handleDeleteProduct(p.id, p.name || p.title)} 
+                      className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
               ))}
@@ -1679,6 +1764,140 @@ Support & Login: https://resellbari.com/login
 
       </main>
 
+      {/* ✏️ EDIT PRODUCT MODAL (Restored & Functional with Brand) */}
+      <AnimatePresence>
+        {editingProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-4 my-8 relative max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  ✏️ Edit Product: {editingProduct.name || editingProduct.title}
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }}
+                  className="text-slate-400 hover:text-white font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateProduct} className="space-y-4">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Product Title</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    value={editingProduct.name || editingProduct.title || ''}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-semibold">Brand Name</label>
+                    <input 
+                      type="text" 
+                      placeholder="Brand Name"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      value={editingProduct.brand || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, brand: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-semibold">Stock Quantity</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500"
+                      value={editingProduct.stock || 0}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-semibold">Base Wholesale Price (৳)</label>
+                    <input 
+                      type="number" 
+                      required 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-bold"
+                      value={editingProduct.price ?? editingProduct.base_price ?? 0}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value, base_price: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-semibold">Suggested Price (৳)</label>
+                    <input 
+                      type="number" 
+                      required 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-bold"
+                      value={editingProduct.suggested_price || 0}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, suggested_price: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-semibold">Category</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none"
+                      value={editingProduct.category || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-semibold">Sub-Category</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-3 text-xs text-white focus:outline-none"
+                      value={editingProduct.sub_category || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, sub_category: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-semibold">Replace Product Images (Optional)</label>
+                  <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*" 
+                    onChange={(e) => handleMultipleFilesChange(e, true)}
+                    className="w-full text-xs text-slate-400 cursor-pointer"
+                  />
+                </div>
+
+                <div className="flex gap-2.5 pt-2">
+                  <button 
+                    type="button" 
+                    onClick={() => { setEditingProduct(null); setEditMediaFiles([]); }}
+                    className="w-1/2 bg-slate-800 text-slate-300 py-3.5 rounded-2xl text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={editUploading}
+                    className="w-1/2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-3.5 rounded-2xl text-xs font-black transition cursor-pointer"
+                  >
+                    {editUploading ? 'Saving...' : 'Update Product'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* 🛡️ BAN SELLER MODAL */}
       {banForm.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -1722,7 +1941,7 @@ Support & Login: https://resellbari.com/login
         </div>
       )}
 
-      {/* 📊 SELLER COMPLETE DETAILS & DASHBOARD MODAL */}
+      {/* 📊 SELLER COMPLETE DETAILS MODAL */}
       {selectedSeller && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl w-full max-w-4xl space-y-6 shadow-2xl relative my-8 max-h-[90vh] overflow-y-auto">
@@ -1734,7 +1953,6 @@ Support & Login: https://resellbari.com/login
               <button onClick={() => setSelectedSeller(null)} className="text-slate-400 hover:text-white text-lg font-bold cursor-pointer">✕</button>
             </div>
 
-            {/* Registration Full Info Grid */}
             <div className="bg-slate-950/70 border border-slate-800 p-5 rounded-2xl space-y-3">
               <h4 className="text-xs uppercase font-extrabold text-emerald-400 tracking-wider">Registration Form Details</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -1768,7 +1986,6 @@ Support & Login: https://resellbari.com/login
               </div>
             </div>
 
-            {/* Payout Banking Details */}
             <div className="bg-slate-950/70 border border-slate-800 p-5 rounded-2xl space-y-3">
               <h4 className="text-xs uppercase font-extrabold text-amber-400 tracking-wider">Payout / Wallet Information</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
@@ -1787,7 +2004,6 @@ Support & Login: https://resellbari.com/login
               </div>
             </div>
 
-            {/* Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800">
                 <p className="text-xs text-slate-400 uppercase font-semibold">Total Orders</p>
@@ -1803,7 +2019,6 @@ Support & Login: https://resellbari.com/login
               </div>
             </div>
 
-            {/* Action Bar */}
             <div className="flex flex-wrap justify-between items-center pt-4 border-t border-slate-800 gap-3">
               <button 
                 onClick={() => handleDeleteSellerProfile(selectedSeller.id, selectedSeller.name)}
@@ -2033,7 +2248,7 @@ Support & Login: https://resellbari.com/login
               <h3 className="text-base sm:text-lg font-bold text-white">
                 Edit Permissions: {editingStaff.full_name || editingStaff.email}
               </h3>
-              <button onClick={() => setEditingStaff(null)} className="text-slate-400 hover:text-white font-bold">✕</button>
+              <button onClick={() => setEditingStaff(null)} className="text-slate-400 hover:text-white font-bold cursor-pointer">✕</button>
             </div>
 
             <div className="space-y-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
@@ -2067,12 +2282,12 @@ Support & Login: https://resellbari.com/login
             </div>
 
             <div className="flex gap-2">
-              <button onClick={() => setEditingStaff(null)} className="w-1/2 bg-slate-800 text-slate-300 py-3 rounded-xl text-xs font-bold">
+              <button onClick={() => setEditingStaff(null)} className="w-1/2 bg-slate-800 text-slate-300 py-3 rounded-xl text-xs font-bold cursor-pointer">
                 Cancel
               </button>
               <button 
                 onClick={() => handleUpdateStaffPermissions(editingStaff.id, editingStaff.permissions)}
-                className="w-1/2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-3 rounded-xl text-xs font-black transition"
+                className="w-1/2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 py-3 rounded-xl text-xs font-black transition cursor-pointer"
               >
                 Save Roles
               </button>
