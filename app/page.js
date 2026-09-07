@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Check,
+  ChevronDown,
 } from "lucide-react";
 
 const FONT_STYLES = `
@@ -192,6 +193,25 @@ const ACCENTS = {
   },
 };
 
+function FilterDropdown({ label, value, onChange, options }) {
+  return (
+    <div className="relative flex-1 min-w-[150px] sm:flex-none sm:w-56">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none bg-white border border-stone-300 text-stone-700 rounded-md pl-4 pr-10 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-emerald-700"
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt === "All" ? `সব ${label}` : opt}
+          </option>
+        ))}
+      </select>
+      <ChevronDown size={18} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
+    </div>
+  );
+}
+
 function NavLink({ href, children, onClick }) {
   return (
     <Link
@@ -217,67 +237,34 @@ export default function HomePage() {
   const [loadingMore, setLoadingMore] = useState(false); // Load More চাপলে
   const [fetchError, setFetchError] = useState(null);
 
-  // Filter metadata (category/subcategory/brand-এর সবগুলো সম্ভাব্য মান, হালকা query দিয়ে আনা)
-  const [filterRows, setFilterRows] = useState([]); // [{ category, subcategory, brand }]
+  // Filter dropdown-এর option গুলো (আলাদা আলাদা, দ্রুত হওয়ার জন্য একসাথে/parallel-এ আনা হয়)
+  const [categoryOptions, setCategoryOptions] = useState(["All"]);
+  const [subcategoryOptions, setSubcategoryOptions] = useState(["All"]);
+  const [brandOptions, setBrandOptions] = useState(["All"]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedSubcategory, setSelectedSubcategory] = useState("All");
   const [selectedBrand, setSelectedBrand] = useState("All");
 
-  // ক্যাটাগরি অনুযায়ী sub-category, sub-category অনুযায়ী brand — cascading options
-  const categories = useMemo(
-    () => ["All", ...new Set(filterRows.map((r) => r.category).filter(Boolean))],
-    [filterRows]
-  );
-  const subcategories = useMemo(
-    () => [
-      "All",
-      ...new Set(
-        filterRows
-          .filter((r) => selectedCategory === "All" || r.category === selectedCategory)
-          .map((r) => r.subcategory)
-          .filter(Boolean)
-      ),
-    ],
-    [filterRows, selectedCategory]
-  );
-  const brands = useMemo(
-    () => [
-      "All",
-      ...new Set(
-        filterRows
-          .filter(
-            (r) =>
-              (selectedCategory === "All" || r.category === selectedCategory) &&
-              (selectedSubcategory === "All" || r.subcategory === selectedSubcategory)
-          )
-          .map((r) => r.brand)
-          .filter(Boolean)
-      ),
-    ],
-    [filterRows, selectedCategory, selectedSubcategory]
-  );
-
-  // একবার শুধু filter option গুলো আনা হয় (হালকা query — শুধু কয়েকটা column, পুরো product row না)
+  // তিনটা filter column আলাদা আলাদা ভাবে, কিন্তু একসাথে (parallel) query হয় —
+  // তাই কোনো column (যেমন subcategory) না থাকলে শুধু সেটাই বাদ পড়ে, বাকিগুলো আটকায় না,
+  // আর sequential try করার মতো সময় নষ্টও হয় না।
   useEffect(() => {
     async function fetchFilterOptions() {
-      // তোমার table-এ subcategory/brand column থাকতেও পারে, নাও থাকতে পারে —
-      // তাই সবচেয়ে বড় combination থেকে শুরু করে, না পেলে ছোট combination try করে।
-      // যেটা প্রথম কাজ করবে সেটাই ব্যবহার হবে, তাই কোনো column না থাকলে console-এ error আসবে না,
-      // শুধু সেই filter row (subcategory/brand) দেখাবে না।
-      const attempts = ["category, subcategory, brand", "category, subcategory", "category, brand", "category"];
+      const [catRes, subRes, brandRes] = await Promise.allSettled([
+        supabase.from("products").select("category"),
+        supabase.from("products").select("subcategory"),
+        supabase.from("products").select("brand"),
+      ]);
 
-      for (const cols of attempts) {
-        try {
-          const { data, error } = await supabase.from("products").select(cols);
-          if (error) throw error;
-          setFilterRows(data || []);
-          return;
-        } catch (err) {
-          // এই combination কাজ করেনি, পরেরটা try করো
-        }
+      if (catRes.status === "fulfilled" && !catRes.value.error && catRes.value.data) {
+        setCategoryOptions(["All", ...new Set(catRes.value.data.map((r) => r.category).filter(Boolean))]);
       }
-
-      console.error("Error fetching filter options: 'category' column পর্যন্ত পাওয়া যায়নি, products table check করো।");
+      if (subRes.status === "fulfilled" && !subRes.value.error && subRes.value.data) {
+        setSubcategoryOptions(["All", ...new Set(subRes.value.data.map((r) => r.subcategory).filter(Boolean))]);
+      }
+      if (brandRes.status === "fulfilled" && !brandRes.value.error && brandRes.value.data) {
+        setBrandOptions(["All", ...new Set(brandRes.value.data.map((r) => r.brand).filter(Boolean))]);
+      }
     }
     fetchFilterOptions();
   }, []);
@@ -296,9 +283,13 @@ export default function HomePage() {
 
       let query = supabase
         .from("products")
-        .select("*")
+        // 🔧 শুধু যেগুলো card-এ দেখানো হয় সেগুলোই আনা হচ্ছে — অপ্রয়োজনীয় ভারী column (যদি থাকে,
+        // যেমন লম্বা description) আনলে network transfer বেশি সময় নেয়, তাই এটাই lag কমানোর একটা বড় অংশ।
+        // তোমার table-এ id/title/name/category/image_url/brand/created_at ছাড়া আর কোনো column
+        // card-এ লাগলে এখানে যোগ করে দিও।
+        .select("id, title, name, category, brand, image_url, created_at")
         .order("created_at", { ascending: false })
-        .range(from, to); // 👈 এইটাই lag fix করে — একসাথে সব product না এনে ২০টা করে আনে
+        .range(from, to); // 👈 একসাথে সব product না এনে ২০টা করে আনে
 
       if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
       if (selectedSubcategory !== "All") query = query.eq("subcategory", selectedSubcategory);
@@ -320,7 +311,7 @@ export default function HomePage() {
     }
   }
 
-  // filter বদলালেই instant প্রথম পেজ থেকে আবার লোড হবে
+  // filter বদলালেই instant প্রথম পেজ থেকে আবার লোড হবে (default অবস্থায় "All" থাকায় প্রথমেই সব product আসে)
   useEffect(() => {
     setPage(0);
     fetchProducts(0, true);
@@ -331,17 +322,6 @@ export default function HomePage() {
     const next = page + 1;
     setPage(next);
     fetchProducts(next, false);
-  };
-
-  const handleCategorySelect = (cat) => {
-    setSelectedCategory(cat);
-    setSelectedSubcategory("All");
-    setSelectedBrand("All");
-  };
-
-  const handleSubcategorySelect = (sub) => {
-    setSelectedSubcategory(sub);
-    setSelectedBrand("All");
   };
 
   const navItems = [
@@ -609,62 +589,22 @@ export default function HomePage() {
             ক্যাটাগরি অনুযায়ী ট্রেন্ডিং প্রোডাক্টগুলো দেখুন এবং রিসেলিং শুরু করতে রেজিস্টার করুন।
           </p>
 
-          {categories.length > 1 && (
-            <div className="mt-8 flex flex-wrap gap-2">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => handleCategorySelect(cat)}
-                  className={
-                    "px-4 py-2 rounded-full text-sm font-medium border transition-colors " +
-                    (selectedCategory === cat
-                      ? "bg-emerald-950 border-emerald-950 text-stone-50"
-                      : "bg-white border-stone-300 text-stone-600 hover:border-emerald-900 hover:text-emerald-900")
-                  }
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {subcategories.length > 1 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {subcategories.map((sub) => (
-                <button
-                  key={sub}
-                  onClick={() => handleSubcategorySelect(sub)}
-                  className={
-                    "px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors " +
-                    (selectedSubcategory === sub
-                      ? "bg-sky-600 border-sky-600 text-white"
-                      : "bg-white border-stone-300 text-stone-600 hover:border-sky-600 hover:text-sky-700")
-                  }
-                >
-                  {sub}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {brands.length > 1 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {brands.map((b) => (
-                <button
-                  key={b}
-                  onClick={() => setSelectedBrand(b)}
-                  className={
-                    "px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors " +
-                    (selectedBrand === b
-                      ? "bg-amber-500 border-amber-500 text-emerald-950"
-                      : "bg-white border-stone-300 text-stone-600 hover:border-amber-500 hover:text-amber-700")
-                  }
-                >
-                  {b}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="mt-8 flex flex-wrap gap-3">
+            {categoryOptions.length > 1 && (
+              <FilterDropdown label="Category" value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} />
+            )}
+            {subcategoryOptions.length > 1 && (
+              <FilterDropdown
+                label="Subcategory"
+                value={selectedSubcategory}
+                onChange={setSelectedSubcategory}
+                options={subcategoryOptions}
+              />
+            )}
+            {brandOptions.length > 1 && (
+              <FilterDropdown label="Brand" value={selectedBrand} onChange={setSelectedBrand} options={brandOptions} />
+            )}
+          </div>
 
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
             {loading
