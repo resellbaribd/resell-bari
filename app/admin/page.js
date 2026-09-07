@@ -16,13 +16,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmailNotification } from '@/lib/email';
 
 export default function AdminDashboard() {
-  // 💾 Persistent Active Tab using localStorage (রিফ্রেশ দিলে একই ট্যাবে থাকবে)
-  const [activeTab, setActiveTab] = useState(() => {
+  // ১. ডিফল্ট স্টেট 'overview' (Hydration mismatch এড়াতে)
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // ২. ব্রাউজারে মাউন্ট হওয়ার পর সেভ থাকা ট্যাব লোড হবে
+  useEffect(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('admin_active_tab') || 'overview';
+      const savedTab = localStorage.getItem('admin_active_tab');
+      if (savedTab) {
+        setActiveTab(savedTab);
+      }
     }
-    return 'overview';
-  });
+  }, []);
 
   const changeTab = (tabId) => {
     setActiveTab(tabId);
@@ -127,7 +132,7 @@ export default function AdminDashboard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // 🚀 Fast & Optimized Data Fetch
+  // 🚀 Fast & Optimized Fetch (লোড স্পিড বাড়ানোর জন্য অপ্টিমাইজড)
   async function fetchAdminData() {
     try {
       const [
@@ -241,7 +246,7 @@ export default function AdminDashboard() {
       if (!error) {
         setEditingStaff(null);
         fetchAdminData();
-      } else throw error;
+      }
     } catch (err) {
       console.error('Error updating permissions: ' + err.message);
     }
@@ -261,7 +266,7 @@ export default function AdminDashboard() {
 
       if (!error) {
         fetchAdminData();
-      } else throw error;
+      }
     } catch (err) {
       console.error('Error: ' + err.message);
     }
@@ -341,7 +346,7 @@ Dashboard Login: https://resellbari.com/login
 
   async function handleConfirmDeclinePayment(e) {
     e.preventDefault();
-    if (!paymentDeclineReason.trim()) return alert('Please enter a reason for declining!');
+    if (!paymentDeclineReason.trim()) return;
     const request = decliningPaymentReq;
     setPaymentActionLoading(request.id);
 
@@ -618,7 +623,7 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  // 🌟 Add Product (Silent & Instant Background Update)
+  // 🌟 Add Product (Silent & Instant Update)
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
@@ -1019,10 +1024,12 @@ Support & Login: https://resellbari.com/login
       {/* 🖥️ MAIN CONTENT */}
       <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden">
         
-        {/* HEADER BAR */}
+        {/* HEADER BAR (Hydration Error সমাধান করা হয়েছে) */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
           <div>
-            <h2 className="text-2xl font-black text-white capitalize">{activeTab === 'team' ? 'Team & Role Permissions' : `${activeTab} Control Center`}</h2>
+            <h2 suppressHydrationWarning className="text-2xl font-black text-white capitalize">
+              {activeTab === 'team' ? 'Team & Role Permissions' : `${activeTab} Control Center`}
+            </h2>
             <p className="text-xs text-slate-400 mt-1">Manage lifecycles, analytics, packages, payments, and team access in real-time.</p>
           </div>
           <div className="text-xs font-mono bg-slate-950 border border-slate-800 px-4 py-2 rounded-xl text-slate-300 font-semibold shadow-inner">
@@ -1225,7 +1232,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 3: RESELLERS (COMPLETE PROFILE DATA + BAN + TERMINATE) */}
+        {/* TAB 3: RESELLERS */}
         {activeTab === 'resellers' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full shadow-lg">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -1282,12 +1289,10 @@ Support & Login: https://resellbari.com/login
                             </div>
                           )}
                         </td>
-
                         <td className="p-4">
                           <div className="font-bold text-slate-200">{seller.district || 'Unset'}</div>
                           <div className="text-slate-400 text-[11px] mt-0.5 max-w-xs truncate">{seller.address || 'Address not provided'}</div>
                         </td>
-
                         <td className="p-4">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase ${
                             seller.plan ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
@@ -1296,7 +1301,6 @@ Support & Login: https://resellbari.com/login
                           </span>
                           <div className="text-[10px] text-slate-500 mt-1 capitalize">Status: {seller.status}</div>
                         </td>
-
                         <td className="p-4">
                           {seller.has_wallet ? (
                             <div className="flex items-center gap-2">
@@ -1309,7 +1313,6 @@ Support & Login: https://resellbari.com/login
                             <span className="text-slate-500 italic">Unset / Not Added</span>
                           )}
                         </td>
-
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button 
@@ -1431,7 +1434,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 5: INVENTORY (WITH 10-PRODUCT PAGINATION & SILENT ADD) */}
+        {/* TAB 5: INVENTORY */}
         {activeTab === 'inventory' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
             <div className="bg-slate-900/60 border border-slate-800 p-6 sm:p-8 rounded-3xl h-fit shadow-lg space-y-5">

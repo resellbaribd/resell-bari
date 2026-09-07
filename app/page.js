@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
@@ -204,41 +204,145 @@ function NavLink({ href, children, onClick }) {
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [loading, setLoading] = useState(true);
 
+  // প্রোডাক্ট + pagination state
+  const [products, setProducts] = useState([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(true); // প্রথমবার / filter বদলালে পুরো grid loading
+  const [loadingMore, setLoadingMore] = useState(false); // Load More চাপলে
+  const [fetchError, setFetchError] = useState(null);
+
+  // Filter metadata (category/subcategory/brand-এর সবগুলো সম্ভাব্য মান, হালকা query দিয়ে আনা)
+  const [filterRows, setFilterRows] = useState([]); // [{ category, subcategory, brand }]
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("All");
+  const [selectedBrand, setSelectedBrand] = useState("All");
+
+  // ক্যাটাগরি অনুযায়ী sub-category, sub-category অনুযায়ী brand — cascading options
+  const categories = useMemo(
+    () => ["All", ...new Set(filterRows.map((r) => r.category).filter(Boolean))],
+    [filterRows]
+  );
+  const subcategories = useMemo(
+    () => [
+      "All",
+      ...new Set(
+        filterRows
+          .filter((r) => selectedCategory === "All" || r.category === selectedCategory)
+          .map((r) => r.subcategory)
+          .filter(Boolean)
+      ),
+    ],
+    [filterRows, selectedCategory]
+  );
+  const brands = useMemo(
+    () => [
+      "All",
+      ...new Set(
+        filterRows
+          .filter(
+            (r) =>
+              (selectedCategory === "All" || r.category === selectedCategory) &&
+              (selectedSubcategory === "All" || r.subcategory === selectedSubcategory)
+          )
+          .map((r) => r.brand)
+          .filter(Boolean)
+      ),
+    ],
+    [filterRows, selectedCategory, selectedSubcategory]
+  );
+
+  // একবার শুধু filter option গুলো আনা হয় (হালকা query — শুধু কয়েকটা column, পুরো product row না)
   useEffect(() => {
-    fetchProducts();
+    async function fetchFilterOptions() {
+      // তোমার table-এ subcategory/brand column থাকতেও পারে, নাও থাকতে পারে —
+      // তাই সবচেয়ে বড় combination থেকে শুরু করে, না পেলে ছোট combination try করে।
+      // যেটা প্রথম কাজ করবে সেটাই ব্যবহার হবে, তাই কোনো column না থাকলে console-এ error আসবে না,
+      // শুধু সেই filter row (subcategory/brand) দেখাবে না।
+      const attempts = ["category, subcategory, brand", "category, subcategory", "category, brand", "category"];
+
+      for (const cols of attempts) {
+        try {
+          const { data, error } = await supabase.from("products").select(cols);
+          if (error) throw error;
+          setFilterRows(data || []);
+          return;
+        } catch (err) {
+          // এই combination কাজ করেনি, পরেরটা try করো
+        }
+      }
+
+      console.error("Error fetching filter options: 'category' column পর্যন্ত পাওয়া যায়নি, products table check করো।");
+    }
+    fetchFilterOptions();
   }, []);
 
-  const fetchProducts = async () => {
+  async function fetchProducts(pageIndex, replace) {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
+      if (replace) {
+        setLoading(true);
+        setFetchError(null);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const from = pageIndex * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
         .from("products")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to); // 👈 এইটাই lag fix করে — একসাথে সব product না এনে ২০টা করে আনে
 
+      if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
+      if (selectedSubcategory !== "All") query = query.eq("subcategory", selectedSubcategory);
+      if (selectedBrand !== "All") query = query.eq("brand", selectedBrand);
+
+      const { data, error } = await query;
       if (error) throw error;
 
-      if (data) {
-        setProducts(data);
-        const uniqueCats = ["All", ...new Set(data.map((item) => item.category).filter(Boolean))];
-        setCategories(uniqueCats);
-      }
+      const newRows = data || [];
+      setProducts((prev) => (replace ? newRows : [...prev, ...newRows]));
+      setHasMore(newRows.length === PAGE_SIZE);
     } catch (err) {
-      console.error("Error fetching products:", err);
+      // আগে এখানে খালি {} print হতো — এখন আসল error message দেখাবে
+      console.error("Error fetching products:", err?.message || err);
+      setFetchError("প্রোডাক্ট লোড করতে সমস্যা হয়েছে। ইন্টারনেট চেক করে আবার চেষ্টা করুন।");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  }
+
+  // filter বদলালেই instant প্রথম পেজ থেকে আবার লোড হবে
+  useEffect(() => {
+    setPage(0);
+    fetchProducts(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, selectedSubcategory, selectedBrand]);
+
+  const handleLoadMore = () => {
+    const next = page + 1;
+    setPage(next);
+    fetchProducts(next, false);
   };
 
-  const filteredProducts =
-    selectedCategory === "All" ? products : products.filter((p) => p.category === selectedCategory);
+  const handleCategorySelect = (cat) => {
+    setSelectedCategory(cat);
+    setSelectedSubcategory("All");
+    setSelectedBrand("All");
+  };
+
+  const handleSubcategorySelect = (sub) => {
+    setSelectedSubcategory(sub);
+    setSelectedBrand("All");
+  };
 
   const navItems = [
     { href: "#how-it-works", label: "How It Works" },
@@ -505,12 +609,12 @@ export default function HomePage() {
             ক্যাটাগরি অনুযায়ী ট্রেন্ডিং প্রোডাক্টগুলো দেখুন এবং রিসেলিং শুরু করতে রেজিস্টার করুন।
           </p>
 
-          {categories.length > 0 && (
+          {categories.length > 1 && (
             <div className="mt-8 flex flex-wrap gap-2">
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => handleCategorySelect(cat)}
                   className={
                     "px-4 py-2 rounded-full text-sm font-medium border transition-colors " +
                     (selectedCategory === cat
@@ -524,17 +628,60 @@ export default function HomePage() {
             </div>
           )}
 
+          {subcategories.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {subcategories.map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => handleSubcategorySelect(sub)}
+                  className={
+                    "px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors " +
+                    (selectedSubcategory === sub
+                      ? "bg-sky-600 border-sky-600 text-white"
+                      : "bg-white border-stone-300 text-stone-600 hover:border-sky-600 hover:text-sky-700")
+                  }
+                >
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {brands.length > 1 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {brands.map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setSelectedBrand(b)}
+                  className={
+                    "px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors " +
+                    (selectedBrand === b
+                      ? "bg-amber-500 border-amber-500 text-emerald-950"
+                      : "bg-white border-stone-300 text-stone-600 hover:border-amber-500 hover:text-amber-700")
+                  }
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
             {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
+              ? Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="bg-white border border-stone-200 rounded-lg h-52 animate-pulse" />
                 ))
-              : filteredProducts.map((p) => (
+              : products.map((p) => (
                   <div key={p.id} className="bg-white border border-stone-200 rounded-lg overflow-hidden flex flex-col">
                     <div className="aspect-square bg-emerald-950/5 flex items-center justify-center overflow-hidden">
                       {p.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.image_url} alt={p.title || p.name} className="w-full h-full object-cover" />
+                        <img
+                          src={p.image_url}
+                          alt={p.title || p.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <Package size={26} className="text-emerald-900/40" />
                       )}
@@ -556,10 +703,34 @@ export default function HomePage() {
                 ))}
           </div>
 
-          {!loading && filteredProducts.length === 0 && (
+          {!loading && fetchError && (
+            <div className="mt-10 text-center">
+              <p className="text-stone-500 text-base">{fetchError}</p>
+              <button
+                onClick={() => fetchProducts(0, true)}
+                className="mt-3 text-sm font-medium text-emerald-900 underline"
+              >
+                আবার চেষ্টা করুন
+              </button>
+            </div>
+          )}
+
+          {!loading && !fetchError && products.length === 0 && (
             <p className="mt-10 text-center text-stone-500 text-base">
               এই ক্যাটাগরিতে বর্তমানে কোনো Product নেই।
             </p>
+          )}
+
+          {!loading && !fetchError && hasMore && products.length > 0 && (
+            <div className="mt-10 flex justify-center">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="border border-emerald-900 text-emerald-900 hover:bg-emerald-900 hover:text-stone-50 font-medium text-base px-8 py-3 rounded-md transition-colors disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : "Load More"}
+              </button>
+            </div>
           )}
         </div>
       </section>
