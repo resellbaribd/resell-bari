@@ -16,7 +16,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmailNotification } from '@/lib/email';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  // 💾 Persistent Active Tab using localStorage (রিফ্রেশ দিলে আগের ট্যাবেই থাকবে)
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('admin_active_tab') || 'overview';
+    }
+    return 'overview';
+  });
+
+  const changeTab = (tabId) => {
+    setActiveTab(tabId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('admin_active_tab', tabId);
+    }
+    setIsMobileMenuOpen(false);
+  };
+
   const [chartFilter, setChartFilter] = useState('daily');
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
@@ -24,6 +39,20 @@ export default function AdminDashboard() {
   const [profiles, setProfiles] = useState([]);
   const [activationRequests, setActivationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 📄 Inventory Pagination State (প্রতি পেজে ১০টি প্রোডাক্ট)
+  const [productPage, setProductPage] = useState(1);
+  const productsPerPage = 10;
+
+  // 🌟 In-App Notification State (ব্রাউজারের অ্যালার্ট পপ-আপের বদলে প্রফেশনাল নোটিশ)
+  const [inAppNotice, setInAppNotice] = useState({ show: false, message: '', type: 'success' });
+
+  const triggerNotice = (message, type = 'success') => {
+    setInAppNotice({ show: true, message, type });
+    setTimeout(() => {
+      setInAppNotice({ show: false, message: '', type: 'success' });
+    }, 3500);
+  };
 
   // 🛡️ Admin Emails List (Protected)
   const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com'];
@@ -36,7 +65,7 @@ export default function AdminDashboard() {
   const [uploading, setUploading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
 
-  // Product Form (Added description state)
+  // Product Form
   const [newProduct, setNewProduct] = useState({ 
     title: '', 
     brand: '',
@@ -103,6 +132,7 @@ export default function AdminDashboard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { fetchAdminData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { fetchAdminData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activation_requests' }, () => { fetchAdminData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { fetchAdminData(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
@@ -163,11 +193,18 @@ export default function AdminDashboard() {
     return Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
   }, [products]);
 
+  // 📄 Paginated Products
+  const totalProductPages = Math.ceil(products.length / productsPerPage) || 1;
+  const paginatedProducts = useMemo(() => {
+    const start = (productPage - 1) * productsPerPage;
+    return products.slice(start, start + productsPerPage);
+  }, [products, productPage]);
+
   // 🛡️ Staff Creation
   async function handleCreateStaff(e) {
     e.preventDefault();
-    if (!staffForm.email || !staffForm.password) return alert('Email & password are required');
-    if (staffForm.permissions.length === 0) return alert('Please select at least one permission');
+    if (!staffForm.email || !staffForm.password) return triggerNotice('Email & password are required', 'error');
+    if (staffForm.permissions.length === 0) return triggerNotice('Please select at least one permission', 'error');
 
     setCreatingStaff(true);
     try {
@@ -180,7 +217,6 @@ export default function AdminDashboard() {
       });
 
       if (authErr) throw authErr;
-
       const newUserId = authData.user?.id;
 
       if (newUserId) {
@@ -194,11 +230,11 @@ export default function AdminDashboard() {
         }]);
       }
 
-      alert(`Admin Access granted for ${staffForm.email}!`);
+      triggerNotice(`Admin Access granted for ${staffForm.email}!`, 'success');
       setStaffForm({ email: '', name: '', password: '', permissions: ['orders', 'inventory'] });
       fetchAdminData();
     } catch (err) {
-      alert('Error creating staff: ' + err.message);
+      triggerNotice('Error creating staff: ' + err.message, 'error');
     } finally {
       setCreatingStaff(false);
     }
@@ -212,18 +248,18 @@ export default function AdminDashboard() {
         .eq('id', staffId);
 
       if (!error) {
-        alert('Permissions updated successfully!');
+        triggerNotice('Permissions updated successfully!', 'success');
         setEditingStaff(null);
         fetchAdminData();
       } else throw error;
     } catch (err) {
-      alert('Error updating permissions: ' + err.message);
+      triggerNotice('Error updating permissions: ' + err.message, 'error');
     }
   }
 
   async function handleRevokeStaff(staffId, email) {
     if (SUPER_ADMINS.includes(email?.toLowerCase())) {
-      return alert('Super Admin cannot be deleted or revoked!');
+      return triggerNotice('Super Admin cannot be deleted or revoked!', 'error');
     }
     if (!confirm(`Are you sure you want to revoke admin access for ${email}?`)) return;
 
@@ -234,11 +270,11 @@ export default function AdminDashboard() {
         .eq('id', staffId);
 
       if (!error) {
-        alert('Admin access revoked successfully.');
+        triggerNotice('Admin access revoked successfully.', 'success');
         fetchAdminData();
       } else throw error;
     } catch (err) {
-      alert('Error: ' + err.message);
+      triggerNotice('Error: ' + err.message, 'error');
     }
   }
 
@@ -306,10 +342,10 @@ Dashboard Login: https://resellbari.com/login
         });
       }
 
-      alert('Payment confirmed & Profile activated successfully!');
+      triggerNotice('Payment confirmed & Profile activated successfully!', 'success');
       fetchAdminData();
     } catch (err) {
-      alert('Error approving payment: ' + err.message);
+      triggerNotice('Error approving payment: ' + err.message, 'error');
     } finally {
       setPaymentActionLoading(null);
     }
@@ -317,7 +353,7 @@ Dashboard Login: https://resellbari.com/login
 
   async function handleConfirmDeclinePayment(e) {
     e.preventDefault();
-    if (!paymentDeclineReason.trim()) return alert('Please enter a reason for declining!');
+    if (!paymentDeclineReason.trim()) return triggerNotice('Please enter a reason for declining!', 'error');
     const request = decliningPaymentReq;
     setPaymentActionLoading(request.id);
 
@@ -347,19 +383,19 @@ Support & Login: https://resellbari.com/login
         });
       }
 
-      alert('Payment declined.');
+      triggerNotice('Payment declined.', 'success');
       setDecliningPaymentReq(null);
       setPaymentDeclineReason('');
       fetchAdminData();
     } catch (err) {
-      alert('Error declining payment: ' + err.message);
+      triggerNotice('Error declining payment: ' + err.message, 'error');
     } finally {
       setPaymentActionLoading(null);
     }
   }
 
   const handleCopyWallet = (text, id) => {
-    if (!text || text === 'Unset' || text.trim() === '') return alert('No payout wallet details added yet!');
+    if (!text || text === 'Unset' || text.trim() === '') return triggerNotice('No payout wallet details added yet!', 'error');
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -377,7 +413,7 @@ Support & Login: https://resellbari.com/login
   const handleMultipleFilesChange = (e, isEdit = false) => {
     const files = Array.from(e.target.files);
     if (files.length > 10) {
-      alert('You can upload a maximum of 10 images!');
+      triggerNotice('You can upload a maximum of 10 images!', 'error');
       return;
     }
     if (isEdit) setEditMediaFiles(files);
@@ -385,39 +421,39 @@ Support & Login: https://resellbari.com/login
   };
 
   async function handleBulkStatusChange() {
-    if (selectedOrderIds.length === 0) return alert('Select at least one order!');
+    if (selectedOrderIds.length === 0) return triggerNotice('Select at least one order!', 'error');
     setBulkUpdating(true);
     const { error } = await supabase.from('orders').update({ status: bulkStatus, updated_at: new Date() }).in('id', selectedOrderIds);
     setBulkUpdating(false);
     if (!error) {
       setOrders(orders.map(o => selectedOrderIds.includes(o.id) ? { ...o, status: bulkStatus } : o));
       setSelectedOrderIds([]);
-      alert('Bulk status updated!');
-    } else alert('Error: ' + error.message);
+      triggerNotice('Bulk status updated!', 'success');
+    } else triggerNotice('Error: ' + error.message, 'error');
   }
 
   async function handleApproveCancel(orderId) {
     if (!confirm('Approve cancellation request? Order will be marked as cancelled.')) return;
     const { error } = await supabase.from('orders').update({ status: 'cancelled', cancel_reason: null, decline_note: null, updated_at: new Date() }).eq('id', orderId);
     if (!error) {
-      alert('Order cancellation approved!');
+      triggerNotice('Order cancellation approved!', 'success');
       setManagingOrder(null);
       fetchAdminData();
     } else {
-      alert('Error: ' + error.message);
+      triggerNotice('Error: ' + error.message, 'error');
     }
   }
 
   async function handleDeclineCancel(orderId) {
-    if (!declineNoteInput.trim()) return alert('Please enter a reason why cancellation is declined!');
+    if (!declineNoteInput.trim()) return triggerNotice('Please enter a reason why cancellation is declined!', 'error');
     const { error } = await supabase.from('orders').update({ status: 'confirmed', decline_note: declineNoteInput, cancel_reason: null, updated_at: new Date() }).eq('id', orderId);
     if (!error) {
-      alert('Cancellation request declined with note!');
+      triggerNotice('Cancellation request declined with note!', 'success');
       setManagingOrder(null);
       setDeclineNoteInput('');
       fetchAdminData();
     } else {
-      alert('Error: ' + error.message);
+      triggerNotice('Error: ' + error.message, 'error');
     }
   }
 
@@ -426,32 +462,32 @@ Support & Login: https://resellbari.com/login
 
     try {
       const { error } = await supabase.from('orders').delete().eq('id', orderId);
-      if (error) { alert('Delete Failed: ' + error.message); return; }
+      if (error) { triggerNotice('Delete Failed: ' + error.message, 'error'); return; }
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
       setSelectedOrderIds(prev => prev.filter(id => id !== orderId));
-      alert('Order successfully deleted from database!');
+      triggerNotice('Order successfully deleted from database!', 'success');
       fetchAdminData();
     } catch (err) {
-      alert('Delete Error: ' + err.message);
+      triggerNotice('Delete Error: ' + err.message, 'error');
     }
   }
 
   async function handleBulkDeleteOrders() {
-    if (selectedOrderIds.length === 0) return alert('Select at least one order!');
+    if (selectedOrderIds.length === 0) return triggerNotice('Select at least one order!', 'error');
     if (!confirm(`Permanently delete ${selectedOrderIds.length} selected order(s)?`)) return;
 
     setBulkUpdating(true);
     try {
       const { error } = await supabase.from('orders').delete().in('id', selectedOrderIds);
-      if (error) { alert('Bulk Delete Failed: ' + error.message); setBulkUpdating(false); return; }
+      if (error) { triggerNotice('Bulk Delete Failed: ' + error.message, 'error'); setBulkUpdating(false); return; }
 
       setOrders(prev => prev.filter(o => !selectedOrderIds.includes(o.id)));
       setSelectedOrderIds([]);
-      alert('Selected orders successfully deleted!');
+      triggerNotice('Selected orders successfully deleted!', 'success');
       fetchAdminData();
     } catch (err) {
-      alert('Bulk Delete Error: ' + err.message);
+      triggerNotice('Bulk Delete Error: ' + err.message, 'error');
     } finally {
       setBulkUpdating(false);
     }
@@ -483,14 +519,14 @@ Support & Login: https://resellbari.com/login
         .eq('id', managingOrder.id);
 
       if (!error) {
-        alert('Order updated successfully!');
+        triggerNotice('Order updated successfully!', 'success');
         setManagingOrder(null);
         fetchAdminData();
       } else {
-        alert('Error updating order: ' + error.message);
+        triggerNotice('Error updating order: ' + error.message, 'error');
       }
     } catch (err) {
-      alert('Error updating order: ' + err.message);
+      triggerNotice('Error updating order: ' + err.message, 'error');
     } finally {
       setUpdateOrderLoading(false);
     }
@@ -607,10 +643,10 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  // 🌟 Add Product (With Brand and Description Support)
+  // 🌟 Add Product (S Silent Success UI Notice)
   async function handleAddProduct(e) {
     e.preventDefault();
-    if (mediaFiles.length === 0) return alert('Please select at least one product image!');
+    if (mediaFiles.length === 0) return triggerNotice('Please select at least one product image!', 'error');
     
     const finalBrand = newBrandInput.trim() !== '' ? newBrandInput.trim() : (newProduct.brand || null);
 
@@ -632,14 +668,14 @@ Support & Login: https://resellbari.com/login
       }]);
 
       if (!error) {
-        alert('Product successfully saved to Inventory!');
+        triggerNotice('Product successfully added to inventory!', 'success');
         setNewProduct({ title: '', brand: '', base_price: '', suggested_price: '', category: '', sub_category: '', description: '', stock: 10 });
         setNewBrandInput('');
         setMediaFiles([]);
         fetchAdminData();
-      } else alert('Error adding product: ' + error.message);
+      } else triggerNotice('Error adding product: ' + error.message, 'error');
     } catch (err) {
-      alert('Upload Error: ' + err.message);
+      triggerNotice('Upload Error: ' + err.message, 'error');
     } finally { 
       setUploading(false); 
     }
@@ -648,11 +684,13 @@ Support & Login: https://resellbari.com/login
   async function handleDeleteProduct(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (!error) setProducts(products.filter(p => p.id !== id));
-    else alert('Error: ' + error.message);
+    if (!error) {
+      setProducts(products.filter(p => p.id !== id));
+      triggerNotice('Product deleted successfully.', 'success');
+    } else triggerNotice('Error: ' + error.message, 'error');
   }
 
-  // 🌟 Update Product (With Description)
+  // 🌟 Update Product
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -676,13 +714,13 @@ Support & Login: https://resellbari.com/login
       }).eq('id', editingProduct.id);
 
       if (!error) { 
-        alert('Product updated successfully!');
+        triggerNotice('Product updated successfully!', 'success');
         setEditingProduct(null); 
         setEditMediaFiles([]); 
         fetchAdminData(); 
-      } else alert('Error: ' + error.message);
+      } else triggerNotice('Error: ' + error.message, 'error');
     } catch (err) {
-      alert('Update Error: ' + err.message);
+      triggerNotice('Update Error: ' + err.message, 'error');
     } finally { 
       setEditUploading(false); 
     }
@@ -702,11 +740,11 @@ Support & Login: https://resellbari.com/login
         }).eq('id', editingPkg.id);
 
         if (!error) {
-          alert('Package updated successfully!');
+          triggerNotice('Package updated successfully!', 'success');
           setEditingPkg(null);
           setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
           fetchAdminData();
-        } else alert('Error updating package: ' + error.message);
+        } else triggerNotice('Error updating package: ' + error.message, 'error');
       } else {
         const { error } = await supabase.from('packages').insert([{
           name: pkgForm.name,
@@ -716,13 +754,13 @@ Support & Login: https://resellbari.com/login
         }]);
 
         if (!error) {
-          alert('Package saved successfully!');
+          triggerNotice('Package saved successfully!', 'success');
           setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
           fetchAdminData();
-        } else alert('Error saving package: ' + error.message);
+        } else triggerNotice('Error saving package: ' + error.message, 'error');
       }
     } catch (err) {
-      alert('Package Save Error: ' + err.message);
+      triggerNotice('Package Save Error: ' + err.message, 'error');
     } finally { 
       setSavingPkg(false); 
     }
@@ -732,13 +770,13 @@ Support & Login: https://resellbari.com/login
     if (!confirm('Are you sure you want to delete this package?')) return;
     const { error } = await supabase.from('packages').delete().eq('id', id);
     if (!error) setPackages(packages.filter(p => p.id !== id));
-    else alert('Error: ' + error.message);
+    else triggerNotice('Error: ' + error.message, 'error');
   }
 
   // 🚫 Seller Ban Handler
   async function handleBanSeller(e) {
     e.preventDefault();
-    if (!banForm.reason.trim()) return alert("Please provide a reason for the ban.");
+    if (!banForm.reason.trim()) return triggerNotice("Please provide a reason for the ban.", 'error');
     
     setIsBanning(true);
     let expiresAt = null;
@@ -763,15 +801,15 @@ Support & Login: https://resellbari.com/login
         .eq('id', banForm.sellerId);
 
       if (!error) {
-        alert('Seller has been banned successfully.');
+        triggerNotice('Seller has been banned successfully.', 'success');
         setBanForm({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' });
         fetchAdminData();
         setSelectedSeller(null);
       } else {
-        alert('Error banning seller: ' + error.message);
+        triggerNotice('Error banning seller: ' + error.message, 'error');
       }
     } catch (err) {
-      alert('Error banning seller: ' + err.message);
+      triggerNotice('Error banning seller: ' + err.message, 'error');
     } finally {
       setIsBanning(false);
     }
@@ -791,14 +829,14 @@ Support & Login: https://resellbari.com/login
         .eq('id', sellerId);
 
       if (!error) {
-        alert('Seller unbanned successfully.');
+        triggerNotice('Seller unbanned successfully.', 'success');
         fetchAdminData();
         setSelectedSeller(null);
       } else {
-        alert('Error unbanning: ' + error.message);
+        triggerNotice('Error unbanning: ' + error.message, 'error');
       }
     } catch (err) {
-      alert('Error unbanning: ' + err.message);
+      triggerNotice('Error unbanning: ' + err.message, 'error');
     }
   }
 
@@ -812,14 +850,14 @@ Support & Login: https://resellbari.com/login
         .eq('id', sellerId);
 
       if (!error) {
-        alert("Reseller terminated and deleted permanently.");
+        triggerNotice("Reseller terminated and deleted permanently.", 'success');
         fetchAdminData();
         setSelectedSeller(null);
       } else {
-        alert("Error deleting seller: " + error.message);
+        triggerNotice("Error deleting seller: " + error.message, 'error');
       }
     } catch (err) {
-      alert("Error deleting seller: " + err.message);
+      triggerNotice("Error deleting seller: " + err.message, 'error');
     }
   }
 
@@ -900,8 +938,27 @@ Support & Login: https://resellbari.com/login
   }, [orders, chartFilter]);
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden relative">
       
+      {/* 🌟 IN-APP NOTIFICATION TOAST (Replaces Browser Alert) */}
+      <AnimatePresence>
+        {inAppNotice.show && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-5 right-5 z-50 px-6 py-3.5 rounded-2xl shadow-2xl border text-xs font-bold flex items-center gap-3 ${
+              inAppNotice.type === 'success' 
+                ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-300 backdrop-blur-md' 
+                : 'bg-rose-950/90 border-rose-500/50 text-rose-300 backdrop-blur-md'
+            }`}
+          >
+            <span>{inAppNotice.type === 'success' ? '✅' : '⚠️'}</span>
+            <span>{inAppNotice.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 📱 MOBILE HEADER */}
       <div className="md:hidden sticky top-0 z-40 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 p-4 flex items-center justify-between shadow-lg">
         <Link href="/" className="flex items-center gap-2.5">
@@ -970,7 +1027,7 @@ Support & Login: https://resellbari.com/login
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }}
+                onClick={() => changeTab(tab.id)}
                 className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-extrabold transition cursor-pointer ${
                   activeTab === tab.id
                     ? 'bg-emerald-500 text-slate-950 shadow-xl shadow-emerald-500/20 translate-x-1'
@@ -1043,7 +1100,7 @@ Support & Login: https://resellbari.com/login
                     <p className="text-xs text-slate-300 mt-1">Resellers submitted payment details. Verify TrxID and activate accounts.</p>
                   </div>
                 </div>
-                <button onClick={() => setActiveTab('payments')} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-6 py-3.5 rounded-2xl transition shadow-lg shrink-0 text-center cursor-pointer">
+                <button onClick={() => changeTab('payments')} className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-6 py-3.5 rounded-2xl transition shadow-lg shrink-0 text-center cursor-pointer">
                   ⚡ Verify Payments ({pendingPayments.length})
                 </button>
               </div>
@@ -1067,7 +1124,7 @@ Support & Login: https://resellbari.com/login
                         <p className="font-bold text-white text-sm">Customer: {o.customer_name} ({o.customer_phone}) - <span className="text-emerald-400">৳{o.total_amount}</span></p>
                         <p className="text-amber-400 mt-1">💬 Reseller Reason: "{o.cancel_reason || 'No reason provided'}"</p>
                       </div>
-                      <button onClick={() => { setActiveTab('orders'); setManagingOrder(o); }} className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2.5 rounded-xl transition shrink-0 cursor-pointer">
+                      <button onClick={() => { changeTab('orders'); setManagingOrder(o); }} className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2.5 rounded-xl transition shrink-0 cursor-pointer">
                         Review & Decide
                       </button>
                     </div>
@@ -1426,7 +1483,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 5: INVENTORY (WITH DESCRIPTION & BRAND) */}
+        {/* TAB 5: INVENTORY (WITH 10-PRODUCT PAGINATION & SILENT ADD) */}
         {activeTab === 'inventory' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
             <div className="bg-slate-900/60 border border-slate-800 p-6 sm:p-8 rounded-3xl h-fit shadow-lg space-y-5">
@@ -1444,7 +1501,6 @@ Support & Login: https://resellbari.com/login
                   />
                 </div>
 
-                {/* Brand Selection */}
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Brand Name</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1487,7 +1543,6 @@ Support & Login: https://resellbari.com/login
                   </div>
                 </div>
 
-                {/* 📝 PRODUCT DESCRIPTION / DETAILS (ADDED) */}
                 <div>
                   <label className="text-xs text-slate-400 block mb-1">Product Description / Details</label>
                   <textarea
@@ -1527,44 +1582,85 @@ Support & Login: https://resellbari.com/login
               </form>
             </div>
 
-            <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-lg">
-              <h3 className="text-lg font-bold text-white mb-4">Inventory Catalogue ({products.length})</h3>
-              {products.map((p) => (
-                <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center hover:border-slate-700 transition">
-                  <div className="flex items-center gap-4">
-                    <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover" alt="" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
-                        {p.brand && (
-                          <span className="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold">
-                            {p.brand}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Base: ৳{p.price} | Sugg: ৳{p.suggested_price || p.price} | Stock: <strong className={p.stock <= 5 ? 'text-rose-400' : 'text-slate-200'}>{p.stock || 0}</strong>
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      type="button"
-                      onClick={() => setEditingProduct(p)} 
-                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 cursor-pointer"
-                    >
-                      ✏️ Edit
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => handleDeleteProduct(p.id, p.name || p.title)} 
-                      className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+            <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-white">Inventory Catalogue ({products.length})</h3>
+                  <span className="text-xs text-slate-400 font-mono">Page {productPage} of {totalProductPages}</span>
                 </div>
-              ))}
+
+                <div className="space-y-3">
+                  {paginatedProducts.map((p) => (
+                    <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center hover:border-slate-700 transition">
+                      <div className="flex items-center gap-4">
+                        <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover" alt="" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
+                            {p.brand && (
+                              <span className="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold">
+                                {p.brand}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Base: ৳{p.price} | Sugg: ৳{p.suggested_price || p.price} | Stock: <strong className={p.stock <= 5 ? 'text-rose-400' : 'text-slate-200'}>{p.stock || 0}</strong>
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          type="button"
+                          onClick={() => setEditingProduct(p)} 
+                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 cursor-pointer"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleDeleteProduct(p.id, p.name || p.title)} 
+                          className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 📄 Pagination Navigation Controls */}
+              {totalProductPages > 1 && (
+                <div className="flex justify-between items-center pt-6 border-t border-slate-800 mt-4">
+                  <button
+                    onClick={() => setProductPage(prev => Math.max(1, prev - 1))}
+                    disabled={productPage === 1}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold disabled:opacity-40 cursor-pointer"
+                  >
+                    ← Previous
+                  </button>
+                  <div className="flex gap-1.5 font-mono text-xs">
+                    {Array.from({ length: totalProductPages }, (_, i) => i + 1).map(num => (
+                      <button
+                        key={num}
+                        onClick={() => setProductPage(num)}
+                        className={`w-8 h-8 rounded-xl font-bold cursor-pointer transition ${
+                          productPage === num ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setProductPage(prev => Math.min(totalProductPages, prev + 1))}
+                    disabled={productPage === totalProductPages}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold disabled:opacity-40 cursor-pointer"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1775,7 +1871,7 @@ Support & Login: https://resellbari.com/login
 
       </main>
 
-      {/* ✏️ EDIT PRODUCT MODAL (WITH DESCRIPTION & BRAND) */}
+      {/* ✏️ EDIT PRODUCT MODAL */}
       <AnimatePresence>
         {editingProduct && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
@@ -1876,7 +1972,6 @@ Support & Login: https://resellbari.com/login
                   </div>
                 </div>
 
-                {/* 📝 PRODUCT DESCRIPTION EDIT (ADDED) */}
                 <div>
                   <label className="text-xs text-slate-400 block mb-1 font-semibold">Product Description / Details</label>
                   <textarea 
