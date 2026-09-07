@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmailNotification } from '@/lib/email';
 
 export default function AdminDashboard() {
-  // 💾 Persistent Active Tab using localStorage (রিফ্রেশ দিলে আগের ট্যাবেই থাকবে)
+  // 💾 Persistent Active Tab using localStorage (রিফ্রেশ দিলে একই ট্যাবে থাকবে)
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('admin_active_tab') || 'overview';
@@ -43,16 +43,6 @@ export default function AdminDashboard() {
   // 📄 Inventory Pagination State (প্রতি পেজে ১০টি প্রোডাক্ট)
   const [productPage, setProductPage] = useState(1);
   const productsPerPage = 10;
-
-  // 🌟 In-App Notification State (ব্রাউজারের অ্যালার্ট পপ-আপের বদলে প্রফেশনাল নোটিশ)
-  const [inAppNotice, setInAppNotice] = useState({ show: false, message: '', type: 'success' });
-
-  const triggerNotice = (message, type = 'success') => {
-    setInAppNotice({ show: true, message, type });
-    setTimeout(() => {
-      setInAppNotice({ show: false, message: '', type: 'success' });
-    }, 3500);
-  };
 
   // 🛡️ Admin Emails List (Protected)
   const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com'];
@@ -137,23 +127,25 @@ export default function AdminDashboard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // 🚀 Fast & Optimized Data Fetch
   async function fetchAdminData() {
     try {
       const [
         { data: profileData },
         { data: orderData, error: orderErr },
-        { data: productData },
+        { data: productData, error: prodErr },
         { data: pkgData },
         { data: requestData, error: reqErr }
       ] = await Promise.all([
-        supabase.from('profiles').select('*'),
-        supabase.from('orders').select('*').order('created_at', { ascending: false }),
-        supabase.from('products').select('*').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('id, full_name, email, phone, role, plan, status, is_banned, ban_reason, ban_expires_at, permissions, created_at, shop_name, website, address, district, payment_method, account_number, bank_name, branch_name'),
+        supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('products').select('id, name, brand, price, suggested_price, category, sub_category, description, image_url, stock, created_at').order('created_at', { ascending: false }),
         supabase.from('packages').select('*').order('price', { ascending: true }),
-        supabase.from('activation_requests').select('*').order('created_at', { ascending: false })
+        supabase.from('activation_requests').select('*').order('created_at', { ascending: false }).limit(200)
       ]);
 
       if (orderErr) console.error('Orders Fetch Error:', orderErr.message);
+      if (prodErr) console.error('Products Fetch Error:', prodErr.message);
       if (reqErr) console.error('Activation Requests Fetch Error:', reqErr.message);
 
       if (profileData) setProfiles(profileData);
@@ -193,7 +185,7 @@ export default function AdminDashboard() {
     return Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
   }, [products]);
 
-  // 📄 Paginated Products
+  // 📄 পেজিনেশন হিসাব
   const totalProductPages = Math.ceil(products.length / productsPerPage) || 1;
   const paginatedProducts = useMemo(() => {
     const start = (productPage - 1) * productsPerPage;
@@ -203,8 +195,8 @@ export default function AdminDashboard() {
   // 🛡️ Staff Creation
   async function handleCreateStaff(e) {
     e.preventDefault();
-    if (!staffForm.email || !staffForm.password) return triggerNotice('Email & password are required', 'error');
-    if (staffForm.permissions.length === 0) return triggerNotice('Please select at least one permission', 'error');
+    if (!staffForm.email || !staffForm.password) return alert('Email & password are required');
+    if (staffForm.permissions.length === 0) return alert('Please select at least one permission');
 
     setCreatingStaff(true);
     try {
@@ -230,11 +222,10 @@ export default function AdminDashboard() {
         }]);
       }
 
-      triggerNotice(`Admin Access granted for ${staffForm.email}!`, 'success');
       setStaffForm({ email: '', name: '', password: '', permissions: ['orders', 'inventory'] });
       fetchAdminData();
     } catch (err) {
-      triggerNotice('Error creating staff: ' + err.message, 'error');
+      console.error('Error creating staff: ' + err.message);
     } finally {
       setCreatingStaff(false);
     }
@@ -248,18 +239,17 @@ export default function AdminDashboard() {
         .eq('id', staffId);
 
       if (!error) {
-        triggerNotice('Permissions updated successfully!', 'success');
         setEditingStaff(null);
         fetchAdminData();
       } else throw error;
     } catch (err) {
-      triggerNotice('Error updating permissions: ' + err.message, 'error');
+      console.error('Error updating permissions: ' + err.message);
     }
   }
 
   async function handleRevokeStaff(staffId, email) {
     if (SUPER_ADMINS.includes(email?.toLowerCase())) {
-      return triggerNotice('Super Admin cannot be deleted or revoked!', 'error');
+      return alert('Super Admin cannot be deleted or revoked!');
     }
     if (!confirm(`Are you sure you want to revoke admin access for ${email}?`)) return;
 
@@ -270,11 +260,10 @@ export default function AdminDashboard() {
         .eq('id', staffId);
 
       if (!error) {
-        triggerNotice('Admin access revoked successfully.', 'success');
         fetchAdminData();
       } else throw error;
     } catch (err) {
-      triggerNotice('Error: ' + err.message, 'error');
+      console.error('Error: ' + err.message);
     }
   }
 
@@ -342,10 +331,9 @@ Dashboard Login: https://resellbari.com/login
         });
       }
 
-      triggerNotice('Payment confirmed & Profile activated successfully!', 'success');
       fetchAdminData();
     } catch (err) {
-      triggerNotice('Error approving payment: ' + err.message, 'error');
+      console.error('Error approving payment: ' + err.message);
     } finally {
       setPaymentActionLoading(null);
     }
@@ -353,7 +341,7 @@ Dashboard Login: https://resellbari.com/login
 
   async function handleConfirmDeclinePayment(e) {
     e.preventDefault();
-    if (!paymentDeclineReason.trim()) return triggerNotice('Please enter a reason for declining!', 'error');
+    if (!paymentDeclineReason.trim()) return alert('Please enter a reason for declining!');
     const request = decliningPaymentReq;
     setPaymentActionLoading(request.id);
 
@@ -383,19 +371,18 @@ Support & Login: https://resellbari.com/login
         });
       }
 
-      triggerNotice('Payment declined.', 'success');
       setDecliningPaymentReq(null);
       setPaymentDeclineReason('');
       fetchAdminData();
     } catch (err) {
-      triggerNotice('Error declining payment: ' + err.message, 'error');
+      console.error('Error declining payment: ' + err.message);
     } finally {
       setPaymentActionLoading(null);
     }
   }
 
   const handleCopyWallet = (text, id) => {
-    if (!text || text === 'Unset' || text.trim() === '') return triggerNotice('No payout wallet details added yet!', 'error');
+    if (!text || text === 'Unset' || text.trim() === '') return;
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -412,8 +399,8 @@ Support & Login: https://resellbari.com/login
 
   const handleMultipleFilesChange = (e, isEdit = false) => {
     const files = Array.from(e.target.files);
-    if (files.length > 10) {
-      triggerNotice('You can upload a maximum of 10 images!', 'error');
+    if (files.length > 5) {
+      alert('Max 5 images allowed per product for optimal speed!');
       return;
     }
     if (isEdit) setEditMediaFiles(files);
@@ -421,39 +408,32 @@ Support & Login: https://resellbari.com/login
   };
 
   async function handleBulkStatusChange() {
-    if (selectedOrderIds.length === 0) return triggerNotice('Select at least one order!', 'error');
+    if (selectedOrderIds.length === 0) return;
     setBulkUpdating(true);
     const { error } = await supabase.from('orders').update({ status: bulkStatus, updated_at: new Date() }).in('id', selectedOrderIds);
     setBulkUpdating(false);
     if (!error) {
       setOrders(orders.map(o => selectedOrderIds.includes(o.id) ? { ...o, status: bulkStatus } : o));
       setSelectedOrderIds([]);
-      triggerNotice('Bulk status updated!', 'success');
-    } else triggerNotice('Error: ' + error.message, 'error');
+    }
   }
 
   async function handleApproveCancel(orderId) {
     if (!confirm('Approve cancellation request? Order will be marked as cancelled.')) return;
     const { error } = await supabase.from('orders').update({ status: 'cancelled', cancel_reason: null, decline_note: null, updated_at: new Date() }).eq('id', orderId);
     if (!error) {
-      triggerNotice('Order cancellation approved!', 'success');
       setManagingOrder(null);
       fetchAdminData();
-    } else {
-      triggerNotice('Error: ' + error.message, 'error');
     }
   }
 
   async function handleDeclineCancel(orderId) {
-    if (!declineNoteInput.trim()) return triggerNotice('Please enter a reason why cancellation is declined!', 'error');
+    if (!declineNoteInput.trim()) return;
     const { error } = await supabase.from('orders').update({ status: 'confirmed', decline_note: declineNoteInput, cancel_reason: null, updated_at: new Date() }).eq('id', orderId);
     if (!error) {
-      triggerNotice('Cancellation request declined with note!', 'success');
       setManagingOrder(null);
       setDeclineNoteInput('');
       fetchAdminData();
-    } else {
-      triggerNotice('Error: ' + error.message, 'error');
     }
   }
 
@@ -462,32 +442,30 @@ Support & Login: https://resellbari.com/login
 
     try {
       const { error } = await supabase.from('orders').delete().eq('id', orderId);
-      if (error) { triggerNotice('Delete Failed: ' + error.message, 'error'); return; }
+      if (error) return;
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
       setSelectedOrderIds(prev => prev.filter(id => id !== orderId));
-      triggerNotice('Order successfully deleted from database!', 'success');
       fetchAdminData();
     } catch (err) {
-      triggerNotice('Delete Error: ' + err.message, 'error');
+      console.error(err);
     }
   }
 
   async function handleBulkDeleteOrders() {
-    if (selectedOrderIds.length === 0) return triggerNotice('Select at least one order!', 'error');
+    if (selectedOrderIds.length === 0) return;
     if (!confirm(`Permanently delete ${selectedOrderIds.length} selected order(s)?`)) return;
 
     setBulkUpdating(true);
     try {
       const { error } = await supabase.from('orders').delete().in('id', selectedOrderIds);
-      if (error) { triggerNotice('Bulk Delete Failed: ' + error.message, 'error'); setBulkUpdating(false); return; }
+      if (error) { setBulkUpdating(false); return; }
 
       setOrders(prev => prev.filter(o => !selectedOrderIds.includes(o.id)));
       setSelectedOrderIds([]);
-      triggerNotice('Selected orders successfully deleted!', 'success');
       fetchAdminData();
     } catch (err) {
-      triggerNotice('Bulk Delete Error: ' + err.message, 'error');
+      console.error(err);
     } finally {
       setBulkUpdating(false);
     }
@@ -519,14 +497,11 @@ Support & Login: https://resellbari.com/login
         .eq('id', managingOrder.id);
 
       if (!error) {
-        triggerNotice('Order updated successfully!', 'success');
         setManagingOrder(null);
         fetchAdminData();
-      } else {
-        triggerNotice('Error updating order: ' + error.message, 'error');
       }
     } catch (err) {
-      triggerNotice('Error updating order: ' + err.message, 'error');
+      console.error(err);
     } finally {
       setUpdateOrderLoading(false);
     }
@@ -540,7 +515,7 @@ Support & Login: https://resellbari.com/login
     const storePhone = managingOrder.seller_phone || '';
     const storeLogo = managingOrder.seller_logo || '';
 
-    const numericInvoiceId = managingOrder.id ? managingOrder.id.replace(/\D/g, '').slice(-5) || '69120' : '69120';
+    const numericInvoiceId = managingOrder.id ? String(managingOrder.id).replace(/\D/g, '').slice(-5) || '69120' : '69120';
     const productName = managingOrder.product_name || 'Product Item';
     const quantity = Number(managingOrder.quantity || 1);
 
@@ -643,10 +618,10 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  // 🌟 Add Product (S Silent Success UI Notice)
+  // 🌟 Add Product (Silent & Instant Background Update)
   async function handleAddProduct(e) {
     e.preventDefault();
-    if (mediaFiles.length === 0) return triggerNotice('Please select at least one product image!', 'error');
+    if (mediaFiles.length === 0) return alert('Please select at least one product image!');
     
     const finalBrand = newBrandInput.trim() !== '' ? newBrandInput.trim() : (newProduct.brand || null);
 
@@ -668,14 +643,15 @@ Support & Login: https://resellbari.com/login
       }]);
 
       if (!error) {
-        triggerNotice('Product successfully added to inventory!', 'success');
         setNewProduct({ title: '', brand: '', base_price: '', suggested_price: '', category: '', sub_category: '', description: '', stock: 10 });
         setNewBrandInput('');
         setMediaFiles([]);
         fetchAdminData();
-      } else triggerNotice('Error adding product: ' + error.message, 'error');
+      } else {
+        console.error('Error adding product:', error.message);
+      }
     } catch (err) {
-      triggerNotice('Upload Error: ' + err.message, 'error');
+      console.error('Upload Error: ' + err.message);
     } finally { 
       setUploading(false); 
     }
@@ -685,9 +661,8 @@ Support & Login: https://resellbari.com/login
     if (!confirm(`Delete "${name}"?`)) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (!error) {
-      setProducts(products.filter(p => p.id !== id));
-      triggerNotice('Product deleted successfully.', 'success');
-    } else triggerNotice('Error: ' + error.message, 'error');
+      setProducts(prev => prev.filter(p => p.id !== id));
+    }
   }
 
   // 🌟 Update Product
@@ -714,13 +689,12 @@ Support & Login: https://resellbari.com/login
       }).eq('id', editingProduct.id);
 
       if (!error) { 
-        triggerNotice('Product updated successfully!', 'success');
         setEditingProduct(null); 
         setEditMediaFiles([]); 
         fetchAdminData(); 
-      } else triggerNotice('Error: ' + error.message, 'error');
+      }
     } catch (err) {
-      triggerNotice('Update Error: ' + err.message, 'error');
+      console.error('Update Error: ' + err.message);
     } finally { 
       setEditUploading(false); 
     }
@@ -740,11 +714,10 @@ Support & Login: https://resellbari.com/login
         }).eq('id', editingPkg.id);
 
         if (!error) {
-          triggerNotice('Package updated successfully!', 'success');
           setEditingPkg(null);
           setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
           fetchAdminData();
-        } else triggerNotice('Error updating package: ' + error.message, 'error');
+        }
       } else {
         const { error } = await supabase.from('packages').insert([{
           name: pkgForm.name,
@@ -754,13 +727,12 @@ Support & Login: https://resellbari.com/login
         }]);
 
         if (!error) {
-          triggerNotice('Package saved successfully!', 'success');
           setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
           fetchAdminData();
-        } else triggerNotice('Error saving package: ' + error.message, 'error');
+        }
       }
     } catch (err) {
-      triggerNotice('Package Save Error: ' + err.message, 'error');
+      console.error('Package Save Error: ' + err.message);
     } finally { 
       setSavingPkg(false); 
     }
@@ -770,13 +742,12 @@ Support & Login: https://resellbari.com/login
     if (!confirm('Are you sure you want to delete this package?')) return;
     const { error } = await supabase.from('packages').delete().eq('id', id);
     if (!error) setPackages(packages.filter(p => p.id !== id));
-    else triggerNotice('Error: ' + error.message, 'error');
   }
 
   // 🚫 Seller Ban Handler
   async function handleBanSeller(e) {
     e.preventDefault();
-    if (!banForm.reason.trim()) return triggerNotice("Please provide a reason for the ban.", 'error');
+    if (!banForm.reason.trim()) return;
     
     setIsBanning(true);
     let expiresAt = null;
@@ -801,15 +772,12 @@ Support & Login: https://resellbari.com/login
         .eq('id', banForm.sellerId);
 
       if (!error) {
-        triggerNotice('Seller has been banned successfully.', 'success');
         setBanForm({ show: false, sellerId: null, sellerName: '', duration: '24h', reason: '' });
         fetchAdminData();
         setSelectedSeller(null);
-      } else {
-        triggerNotice('Error banning seller: ' + error.message, 'error');
       }
     } catch (err) {
-      triggerNotice('Error banning seller: ' + err.message, 'error');
+      console.error(err);
     } finally {
       setIsBanning(false);
     }
@@ -829,19 +797,17 @@ Support & Login: https://resellbari.com/login
         .eq('id', sellerId);
 
       if (!error) {
-        triggerNotice('Seller unbanned successfully.', 'success');
         fetchAdminData();
         setSelectedSeller(null);
-      } else {
-        triggerNotice('Error unbanning: ' + error.message, 'error');
       }
     } catch (err) {
-      triggerNotice('Error unbanning: ' + err.message, 'error');
+      console.error(err);
     }
   }
 
+  // 🗑️ Permanent Delete Seller Profile
   async function handleDeleteSellerProfile(sellerId, sellerName) {
-    if (!confirm(`⚠️ PERMANENT TERMINATION WARNING:\n\nAre you sure you want to completely delete reseller "${sellerName}"?\nThis will remove their profile and store settings from the system permanently.`)) return;
+    if (!confirm(`⚠️ PERMANENT TERMINATION WARNING:\n\nAre you sure you want to completely delete reseller "${sellerName}"?\nThis action cannot be undone.`)) return;
     
     try {
       const { error } = await supabase
@@ -850,14 +816,11 @@ Support & Login: https://resellbari.com/login
         .eq('id', sellerId);
 
       if (!error) {
-        triggerNotice("Reseller terminated and deleted permanently.", 'success');
         fetchAdminData();
         setSelectedSeller(null);
-      } else {
-        triggerNotice("Error deleting seller: " + error.message, 'error');
       }
     } catch (err) {
-      triggerNotice("Error deleting seller: " + err.message, 'error');
+      console.error(err);
     }
   }
 
@@ -869,7 +832,7 @@ Support & Login: https://resellbari.com/login
       .forEach(p => {
         const hasCustomWallet = !!p.payment_method;
         const walletMethod = p.payment_method || 'Unset';
-        const rawWalletNum = p.account_number || p.bkash_number || p.payment_number || '';
+        const rawWalletNum = p.account_number || '';
         
         sellerMap[p.id] = {
           id: p.id,
@@ -940,25 +903,6 @@ Support & Login: https://resellbari.com/login
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden relative">
       
-      {/* 🌟 IN-APP NOTIFICATION TOAST (Replaces Browser Alert) */}
-      <AnimatePresence>
-        {inAppNotice.show && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-5 right-5 z-50 px-6 py-3.5 rounded-2xl shadow-2xl border text-xs font-bold flex items-center gap-3 ${
-              inAppNotice.type === 'success' 
-                ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-300 backdrop-blur-md' 
-                : 'bg-rose-950/90 border-rose-500/50 text-rose-300 backdrop-blur-md'
-            }`}
-          >
-            <span>{inAppNotice.type === 'success' ? '✅' : '⚠️'}</span>
-            <span>{inAppNotice.message}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* 📱 MOBILE HEADER */}
       <div className="md:hidden sticky top-0 z-40 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 p-4 flex items-center justify-between shadow-lg">
         <Link href="/" className="flex items-center gap-2.5">
@@ -1281,7 +1225,7 @@ Support & Login: https://resellbari.com/login
           </div>
         )}
 
-        {/* TAB 3: RESELLERS */}
+        {/* TAB 3: RESELLERS (COMPLETE PROFILE DATA + BAN + TERMINATE) */}
         {activeTab === 'resellers' && (
           <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full shadow-lg">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -1338,10 +1282,12 @@ Support & Login: https://resellbari.com/login
                             </div>
                           )}
                         </td>
+
                         <td className="p-4">
                           <div className="font-bold text-slate-200">{seller.district || 'Unset'}</div>
                           <div className="text-slate-400 text-[11px] mt-0.5 max-w-xs truncate">{seller.address || 'Address not provided'}</div>
                         </td>
+
                         <td className="p-4">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase ${
                             seller.plan ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
@@ -1350,6 +1296,7 @@ Support & Login: https://resellbari.com/login
                           </span>
                           <div className="text-[10px] text-slate-500 mt-1 capitalize">Status: {seller.status}</div>
                         </td>
+
                         <td className="p-4">
                           {seller.has_wallet ? (
                             <div className="flex items-center gap-2">
@@ -1362,6 +1309,7 @@ Support & Login: https://resellbari.com/login
                             <span className="text-slate-500 italic">Unset / Not Added</span>
                           )}
                         </td>
+
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button 
@@ -1589,47 +1537,59 @@ Support & Login: https://resellbari.com/login
                   <span className="text-xs text-slate-400 font-mono">Page {productPage} of {totalProductPages}</span>
                 </div>
 
-                <div className="space-y-3">
-                  {paginatedProducts.map((p) => (
-                    <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center hover:border-slate-700 transition">
-                      <div className="flex items-center gap-4">
-                        <img src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover" alt="" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
-                            {p.brand && (
-                              <span className="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold">
-                                {p.brand}
-                              </span>
-                            )}
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <div key={n} className="h-16 bg-slate-800/40 animate-pulse rounded-2xl" />
+                    ))}
+                  </div>
+                ) : products.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500 text-xs">
+                    No products found in catalogue.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {paginatedProducts.map((p) => (
+                      <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center hover:border-slate-700 transition">
+                        <div className="flex items-center gap-4">
+                          <img src={p.image_url || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover" alt="" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
+                              {p.brand && (
+                                <span className="text-[10px] bg-slate-800 text-amber-400 px-2 py-0.5 rounded-full border border-slate-700 font-semibold">
+                                  {p.brand}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Base: ৳{p.price} | Sugg: ৳{p.suggested_price || p.price} | Stock: <strong className={p.stock <= 5 ? 'text-rose-400' : 'text-slate-200'}>{p.stock || 0}</strong>
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Base: ৳{p.price} | Sugg: ৳{p.suggested_price || p.price} | Stock: <strong className={p.stock <= 5 ? 'text-rose-400' : 'text-slate-200'}>{p.stock || 0}</strong>
-                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={() => setEditingProduct(p)} 
+                            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 cursor-pointer"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteProduct(p.id, p.name || p.title)} 
+                            className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
+                          >
+                            🗑️
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button 
-                          type="button"
-                          onClick={() => setEditingProduct(p)} 
-                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-xl text-xs font-bold border border-slate-700 cursor-pointer"
-                        >
-                          ✏️ Edit
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => handleDeleteProduct(p.id, p.name || p.title)} 
-                          className="px-3.5 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold cursor-pointer"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* 📄 Pagination Navigation Controls */}
+              {/* 📄 Pagination Controls */}
               {totalProductPages > 1 && (
                 <div className="flex justify-between items-center pt-6 border-t border-slate-800 mt-4">
                   <button
