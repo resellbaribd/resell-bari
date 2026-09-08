@@ -443,6 +443,25 @@ Support & Login: https://resellbari.com/login
     });
   };
 
+  // 🖼️ Supabase Storage তে ছবি আপলোড করে পাবলিক URL রিটার্ন করে
+  // (আগের base64 পদ্ধতির বদলে - এটাই ডাটাবেজকে হালকা ও দ্রুত রাখে)
+  const handleImageUpload = async (file) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  };
+
   const handleMultipleFilesChange = (e, isEdit = false) => {
     const files = Array.from(e.target.files);
     if (files.length > 5) {
@@ -675,7 +694,7 @@ Support & Login: https://resellbari.com/login
 
     setUploading(true);
     try {
-      const imageList = await Promise.all(mediaFiles.map(file => handleFileConvert(file)));
+      const imageList = await Promise.all(mediaFiles.map(file => handleImageUpload(file)));
       
       const { data, error } = await supabase.from('products').insert([{
         name: newProduct.title,
@@ -727,7 +746,7 @@ Support & Login: https://resellbari.com/login
     try {
       let finalImages = editingProduct.images || (editingProduct.image_url ? [editingProduct.image_url] : []);
       if (editMediaFiles.length > 0) {
-        finalImages = await Promise.all(editMediaFiles.map(file => handleFileConvert(file)));
+        finalImages = await Promise.all(editMediaFiles.map(file => handleImageUpload(file)));
       }
 
       const { data, error } = await supabase.from('products').update({
