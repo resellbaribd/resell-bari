@@ -284,11 +284,11 @@ function ProductCard({ p }) {
 
         <div
           className={
-            "absolute inset-0 bg-emerald-950/85 flex items-center justify-center text-center px-3 transition-opacity duration-200 " +
+            "absolute inset-0 bg-emerald-950/85 flex items-center justify-center text-center px-4 transition-opacity duration-200 " +
             (revealed ? "opacity-100" : "opacity-0 group-hover:opacity-100")
           }
         >
-          <span className="text-stone-50 text-sm font-medium leading-snug">
+          <span className="text-stone-50 text-lg sm:text-xl font-semibold leading-relaxed">
             স্পেশাল হোলসেল প্রাইজ দেখতে রেজিস্টার করুন
           </span>
         </div>
@@ -402,7 +402,9 @@ export default function HomePage() {
       if (debouncedSearch) {
         const safeTerm = debouncedSearch.replace(/[,%]/g, ""); // Postgrest .or() syntax-এ কমা/% বিপদজনক
         if (safeTerm) {
-          query = query.or(`title.ilike.%${safeTerm}%,name.ilike.%${safeTerm}%`);
+          query = query.or(
+            `title.ilike.%${safeTerm}%,name.ilike.%${safeTerm}%,category.ilike.%${safeTerm}%,sub_category.ilike.%${safeTerm}%,brand.ilike.%${safeTerm}%`
+          );
         }
       }
 
