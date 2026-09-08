@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import {
@@ -14,6 +14,7 @@ import {
   X,
   Check,
   ChevronDown,
+  Search,
 } from "lucide-react";
 
 const FONT_STYLES = `
@@ -193,21 +194,119 @@ const ACCENTS = {
   },
 };
 
-function FilterDropdown({ label, value, onChange, options }) {
+// 🔍 Search করা যায় এমন dropdown — category/subcategory/brand-এর লিস্ট বড় হলে সহজে খুঁজে বের করার জন্য
+function SearchableDropdown({ label, value, onChange, options }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    function handleOutsideClick(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  const filtered = options.filter((opt) => opt.toLowerCase().includes(query.toLowerCase()));
+
   return (
-    <div className="relative flex-1 min-w-[150px] sm:flex-none sm:w-56">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none bg-white border border-stone-300 text-stone-700 rounded-md pl-4 pr-10 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-emerald-700"
+    <div ref={boxRef} className="relative flex-1 min-w-[150px] sm:flex-none sm:w-56">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 bg-white border border-stone-300 text-stone-700 rounded-md pl-4 pr-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-emerald-700"
       >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt === "All" ? `সব ${label}` : opt}
-          </option>
-        ))}
-      </select>
-      <ChevronDown size={18} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
+        <span className="truncate">{value === "All" ? `সব ${label}` : value}</span>
+        <ChevronDown size={18} className={"shrink-0 text-stone-400 transition-transform " + (open ? "rotate-180" : "")} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-stone-200 rounded-md shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-stone-100 relative">
+            <Search size={14} className="absolute left-4.5 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`${label} খুঁজুন...`}
+              className="w-full pl-8 pr-2 py-1.5 text-sm border border-stone-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-700"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-stone-400">কিছু পাওয়া যায়নি</p>
+            ) : (
+              filtered.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className={
+                    "w-full text-left px-4 py-2 text-sm hover:bg-stone-50 transition-colors " +
+                    (value === opt ? "bg-emerald-50 text-emerald-900 font-medium" : "text-stone-700")
+                  }
+                >
+                  {opt === "All" ? `সব ${label}` : opt}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 🛍️ প্রতিটা product card — hover / tap করলে "রেজিস্টার করুন" ওভারলে দেখাবে
+function ProductCard({ p }) {
+  const [revealed, setRevealed] = useState(false);
+
+  return (
+    <div className="group bg-white border border-stone-200 rounded-lg overflow-hidden flex flex-col">
+      <div
+        className="relative aspect-square bg-emerald-950/5 flex items-center justify-center overflow-hidden cursor-pointer"
+        onClick={() => setRevealed((v) => !v)}
+      >
+        {p.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={p.image_url} alt={p.title || p.name} loading="lazy" className="w-full h-full object-cover" />
+        ) : (
+          <Package size={26} className="text-emerald-900/40" />
+        )}
+
+        <div
+          className={
+            "absolute inset-0 bg-emerald-950/85 flex items-center justify-center text-center px-3 transition-opacity duration-200 " +
+            (revealed ? "opacity-100" : "opacity-0 group-hover:opacity-100")
+          }
+        >
+          <span className="text-stone-50 text-sm font-medium leading-snug">
+            স্পেশাল হোলসেল প্রাইজ দেখতে রেজিস্টার করুন
+          </span>
+        </div>
+      </div>
+
+      <div className="p-3.5 sm:p-4 flex flex-col flex-1">
+        {p.category && <span className="text-sm text-stone-500">{p.category}</span>}
+        <h3 className="font-body font-semibold text-base sm:text-lg text-stone-900 mt-0.5 line-clamp-2">
+          {p.title || p.name}
+        </h3>
+        <p className="mt-2.5 text-sm text-stone-500 flex-1">হোলসেল রেট দেখতে রেজিস্টার করুন</p>
+        <Link
+          href="/register"
+          className="mt-3 text-center text-sm font-medium bg-emerald-950 text-stone-50 py-2.5 rounded-md hover:bg-emerald-900 transition-colors"
+        >
+          Register Now
+        </Link>
+      </div>
     </div>
   );
 }
@@ -233,11 +332,20 @@ export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true); // প্রথমবার / filter বদলালে পুরো grid loading
-  const [loadingMore, setLoadingMore] = useState(false); // Load More চাপলে
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Filter dropdown-এর option গুলো (আলাদা আলাদা, দ্রুত হওয়ার জন্য একসাথে/parallel-এ আনা হয়)
+  // প্রোডাক্ট নাম দিয়ে সরাসরি খোঁজার জন্য search bar (debounce করা)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Filter dropdown-এর option গুলো
   const [categoryOptions, setCategoryOptions] = useState(["All"]);
   const [subcategoryOptions, setSubcategoryOptions] = useState(["All"]);
   const [brandOptions, setBrandOptions] = useState(["All"]);
@@ -245,14 +353,14 @@ export default function HomePage() {
   const [selectedSubcategory, setSelectedSubcategory] = useState("All");
   const [selectedBrand, setSelectedBrand] = useState("All");
 
-  // তিনটা filter column আলাদা আলাদা ভাবে, কিন্তু একসাথে (parallel) query হয় —
-  // তাই কোনো column (যেমন subcategory) না থাকলে শুধু সেটাই বাদ পড়ে, বাকিগুলো আটকায় না,
-  // আর sequential try করার মতো সময় নষ্টও হয় না।
+  // 🔧 তোমার Admin Panel প্রোডাক্ট যোগ করার সময় "sub_category" (underscore সহ) column ব্যবহার করে —
+  // আগে এখানে "subcategory" (underscore ছাড়া) লেখা ছিল বলে কখনো মিলছিল না, তাই filter-এ subcategory
+  // দেখাচ্ছিল না। এখন column নাম ঠিক করে দেওয়া হয়েছে।
   useEffect(() => {
     async function fetchFilterOptions() {
       const [catRes, subRes, brandRes] = await Promise.allSettled([
         supabase.from("products").select("category"),
-        supabase.from("products").select("subcategory"),
+        supabase.from("products").select("sub_category"),
         supabase.from("products").select("brand"),
       ]);
 
@@ -260,7 +368,7 @@ export default function HomePage() {
         setCategoryOptions(["All", ...new Set(catRes.value.data.map((r) => r.category).filter(Boolean))]);
       }
       if (subRes.status === "fulfilled" && !subRes.value.error && subRes.value.data) {
-        setSubcategoryOptions(["All", ...new Set(subRes.value.data.map((r) => r.subcategory).filter(Boolean))]);
+        setSubcategoryOptions(["All", ...new Set(subRes.value.data.map((r) => r.sub_category).filter(Boolean))]);
       }
       if (brandRes.status === "fulfilled" && !brandRes.value.error && brandRes.value.data) {
         setBrandOptions(["All", ...new Set(brandRes.value.data.map((r) => r.brand).filter(Boolean))]);
@@ -283,17 +391,20 @@ export default function HomePage() {
 
       let query = supabase
         .from("products")
-        // 🔧 শুধু যেগুলো card-এ দেখানো হয় সেগুলোই আনা হচ্ছে — অপ্রয়োজনীয় ভারী column (যদি থাকে,
-        // যেমন লম্বা description) আনলে network transfer বেশি সময় নেয়, তাই এটাই lag কমানোর একটা বড় অংশ।
-        // তোমার table-এ id/title/name/category/image_url/brand/created_at ছাড়া আর কোনো column
-        // card-এ লাগলে এখানে যোগ করে দিও।
-        .select("id, title, name, category, brand, image_url, created_at")
+        .select("id, title, name, category, sub_category, brand, image_url, created_at")
         .order("created_at", { ascending: false })
-        .range(from, to); // 👈 একসাথে সব product না এনে ২০টা করে আনে
+        .range(from, to);
 
       if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
-      if (selectedSubcategory !== "All") query = query.eq("subcategory", selectedSubcategory);
+      if (selectedSubcategory !== "All") query = query.eq("sub_category", selectedSubcategory);
       if (selectedBrand !== "All") query = query.eq("brand", selectedBrand);
+
+      if (debouncedSearch) {
+        const safeTerm = debouncedSearch.replace(/[,%]/g, ""); // Postgrest .or() syntax-এ কমা/% বিপদজনক
+        if (safeTerm) {
+          query = query.or(`title.ilike.%${safeTerm}%,name.ilike.%${safeTerm}%`);
+        }
+      }
 
       const { data, error } = await query;
       if (error) throw error;
@@ -302,7 +413,6 @@ export default function HomePage() {
       setProducts((prev) => (replace ? newRows : [...prev, ...newRows]));
       setHasMore(newRows.length === PAGE_SIZE);
     } catch (err) {
-      // আগে এখানে খালি {} print হতো — এখন আসল error message দেখাবে
       console.error("Error fetching products:", err?.message || err);
       setFetchError("প্রোডাক্ট লোড করতে সমস্যা হয়েছে। ইন্টারনেট চেক করে আবার চেষ্টা করুন।");
     } finally {
@@ -311,12 +421,11 @@ export default function HomePage() {
     }
   }
 
-  // filter বদলালেই instant প্রথম পেজ থেকে আবার লোড হবে (default অবস্থায় "All" থাকায় প্রথমেই সব product আসে)
   useEffect(() => {
     setPage(0);
     fetchProducts(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, selectedSubcategory, selectedBrand]);
+  }, [selectedCategory, selectedSubcategory, selectedBrand, debouncedSearch]);
 
   const handleLoadMore = () => {
     const next = page + 1;
@@ -589,12 +698,24 @@ export default function HomePage() {
             ক্যাটাগরি অনুযায়ী ট্রেন্ডিং প্রোডাক্টগুলো দেখুন এবং রিসেলিং শুরু করতে রেজিস্টার করুন।
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          {/* প্রোডাক্ট নাম দিয়ে সরাসরি খোঁজার search bar */}
+          <div className="mt-8 relative max-w-md">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="প্রোডাক্টের নাম লিখে খুঁজুন..."
+              className="w-full bg-white border border-stone-300 rounded-md pl-11 pr-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-emerald-700"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
             {categoryOptions.length > 1 && (
-              <FilterDropdown label="Category" value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} />
+              <SearchableDropdown label="Category" value={selectedCategory} onChange={setSelectedCategory} options={categoryOptions} />
             )}
             {subcategoryOptions.length > 1 && (
-              <FilterDropdown
+              <SearchableDropdown
                 label="Subcategory"
                 value={selectedSubcategory}
                 onChange={setSelectedSubcategory}
@@ -602,7 +723,7 @@ export default function HomePage() {
               />
             )}
             {brandOptions.length > 1 && (
-              <FilterDropdown label="Brand" value={selectedBrand} onChange={setSelectedBrand} options={brandOptions} />
+              <SearchableDropdown label="Brand" value={selectedBrand} onChange={setSelectedBrand} options={brandOptions} />
             )}
           </div>
 
@@ -611,36 +732,7 @@ export default function HomePage() {
               ? Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="bg-white border border-stone-200 rounded-lg h-52 animate-pulse" />
                 ))
-              : products.map((p) => (
-                  <div key={p.id} className="bg-white border border-stone-200 rounded-lg overflow-hidden flex flex-col">
-                    <div className="aspect-square bg-emerald-950/5 flex items-center justify-center overflow-hidden">
-                      {p.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.image_url}
-                          alt={p.title || p.name}
-                          loading="lazy"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package size={26} className="text-emerald-900/40" />
-                      )}
-                    </div>
-                    <div className="p-3.5 sm:p-4 flex flex-col flex-1">
-                      {p.category && <span className="text-sm text-stone-500">{p.category}</span>}
-                      <h3 className="font-body font-semibold text-base sm:text-lg text-stone-900 mt-0.5 line-clamp-2">
-                        {p.title || p.name}
-                      </h3>
-                      <p className="mt-2.5 text-sm text-stone-500 flex-1">হোলসেল রেট দেখতে রেজিস্টার করুন</p>
-                      <Link
-                        href="/register"
-                        className="mt-3 text-center text-sm font-medium bg-emerald-950 text-stone-50 py-2.5 rounded-md hover:bg-emerald-900 transition-colors"
-                      >
-                        Register Now
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+              : products.map((p) => <ProductCard key={p.id} p={p} />)}
           </div>
 
           {!loading && fetchError && (
@@ -657,7 +749,7 @@ export default function HomePage() {
 
           {!loading && !fetchError && products.length === 0 && (
             <p className="mt-10 text-center text-stone-500 text-base">
-              এই ক্যাটাগরিতে বর্তমানে কোনো Product নেই।
+              কোনো Product পাওয়া যায়নি। অন্য নাম বা Filter দিয়ে চেষ্টা করুন।
             </p>
           )}
 
