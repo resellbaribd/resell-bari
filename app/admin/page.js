@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   ResponsiveContainer,
@@ -16,10 +16,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmailNotification } from '@/lib/email';
 
 export default function AdminDashboard() {
-  // ১. ডিফল্ট স্টেট 'overview' (Hydration mismatch এড়াতে)
+  // ১. ডিফল্ট স্টেট 'overview' (Hydration mismatch এড়াতে)
   const [activeTab, setActiveTab] = useState('overview');
 
-  // ২. ব্রাউজারে মাউন্ট হওয়ার পর সেভ থাকা ট্যাব লোড হবে
+  // ২. ব্রাউজারে মাউন্ট হওয়ার পর সেভ থাকা ট্যাব লোড হবে
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTab = localStorage.getItem('admin_active_tab');
@@ -44,6 +44,18 @@ export default function AdminDashboard() {
   const [profiles, setProfiles] = useState([]);
   const [activationRequests, setActivationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 🔔 Toast Notification (Add/Update/Delete succeed হলে দেখানোর জন্য)
+  const [toast, setToast] = useState(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // 🚦 Fetch Lock (একসাথে একাধিকবার fetchAdminData চলা আটকানোর জন্য - স্পিড ফিক্স)
+  const fetchLockRef = useRef(false);
+  const pendingRefetchRef = useRef(false);
 
   // 📄 Inventory Pagination State (প্রতি পেজে ১০টি প্রোডাক্ট)
   const [productPage, setProductPage] = useState(1);
@@ -123,17 +135,34 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchAdminData();
+
+    // ⏱️ Debounce: একসাথে অনেকগুলো DB change event এলে বারবার fetch না করে
+    // ৫০০ms অপেক্ষা করে একবারেই fetch করবে (স্পিড ফিক্স)
+    let debounceTimer = null;
+    const debouncedFetch = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchAdminData, 500);
+    };
+
     const channel = supabase.channel('schema-db-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { fetchAdminData(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { fetchAdminData(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'activation_requests' }, () => { fetchAdminData(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { fetchAdminData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activation_requests' }, debouncedFetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, debouncedFetch)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(debounceTimer); supabase.removeChannel(channel); };
   }, []);
 
-  // 🚀 Fast & Optimized Fetch (লোড স্পিড বাড়ানোর জন্য অপ্টিমাইজড)
+  // 🚀 Fast & Optimized Fetch (লোড স্পিড বাড়ানোর জন্য অপ্টিমাইজড)
   async function fetchAdminData() {
+    // 🚦 যদি ইতিমধ্যে একটা fetch চলছে, তাহলে নতুন করে শুরু না করে
+    // "পরে আরেকবার fetch করো" এই সিগন্যাল রেখে দেই। এতে ডাবল/ট্রিপল ফুল-রিফেচ বন্ধ হবে।
+    if (fetchLockRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    fetchLockRef.current = true;
+
     try {
       const [
         { data: profileData },
@@ -182,6 +211,12 @@ export default function AdminDashboard() {
       console.error('Data Fetch Error:', err);
     } finally {
       setLoading(false);
+      fetchLockRef.current = false;
+      // 🚦 fetch চলাকালীন যদি আরেকটা রিফেচ রিকোয়েস্ট জমা হয়ে থাকে, এখন সেটা চালাও
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        fetchAdminData();
+      }
     }
   }
 
@@ -228,9 +263,11 @@ export default function AdminDashboard() {
       }
 
       setStaffForm({ email: '', name: '', password: '', permissions: ['orders', 'inventory'] });
+      setToast({ type: 'success', message: '✅ Staff Created Successfully!' });
       fetchAdminData();
     } catch (err) {
       console.error('Error creating staff: ' + err.message);
+      setToast({ type: 'error', message: 'Failed to create staff.' });
     } finally {
       setCreatingStaff(false);
     }
@@ -245,6 +282,7 @@ export default function AdminDashboard() {
 
       if (!error) {
         setEditingStaff(null);
+        setToast({ type: 'success', message: '✅ Permissions Updated!' });
         fetchAdminData();
       }
     } catch (err) {
@@ -336,9 +374,11 @@ Dashboard Login: https://resellbari.com/login
         });
       }
 
+      setToast({ type: 'success', message: '✅ Payment Approved!' });
       fetchAdminData();
     } catch (err) {
       console.error('Error approving payment: ' + err.message);
+      setToast({ type: 'error', message: 'Failed to approve payment.' });
     } finally {
       setPaymentActionLoading(null);
     }
@@ -378,6 +418,7 @@ Support & Login: https://resellbari.com/login
 
       setDecliningPaymentReq(null);
       setPaymentDeclineReason('');
+      setToast({ type: 'success', message: 'Payment Declined.' });
       fetchAdminData();
     } catch (err) {
       console.error('Error declining payment: ' + err.message);
@@ -420,6 +461,7 @@ Support & Login: https://resellbari.com/login
     if (!error) {
       setOrders(orders.map(o => selectedOrderIds.includes(o.id) ? { ...o, status: bulkStatus } : o));
       setSelectedOrderIds([]);
+      setToast({ type: 'success', message: '✅ Orders Updated!' });
     }
   }
 
@@ -451,7 +493,7 @@ Support & Login: https://resellbari.com/login
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
       setSelectedOrderIds(prev => prev.filter(id => id !== orderId));
-      fetchAdminData();
+      setToast({ type: 'success', message: 'Order Deleted.' });
     } catch (err) {
       console.error(err);
     }
@@ -468,7 +510,7 @@ Support & Login: https://resellbari.com/login
 
       setOrders(prev => prev.filter(o => !selectedOrderIds.includes(o.id)));
       setSelectedOrderIds([]);
-      fetchAdminData();
+      setToast({ type: 'success', message: 'Selected Orders Deleted.' });
     } catch (err) {
       console.error(err);
     } finally {
@@ -503,6 +545,7 @@ Support & Login: https://resellbari.com/login
 
       if (!error) {
         setManagingOrder(null);
+        setToast({ type: 'success', message: '✅ Order Updated!' });
         fetchAdminData();
       }
     } catch (err) {
@@ -623,7 +666,7 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  // 🌟 Add Product (Silent & Instant Update)
+  // 🌟 Add Product (Instant Show + Success Notice)
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
@@ -634,7 +677,7 @@ Support & Login: https://resellbari.com/login
     try {
       const imageList = await Promise.all(mediaFiles.map(file => handleFileConvert(file)));
       
-      const { error } = await supabase.from('products').insert([{
+      const { data, error } = await supabase.from('products').insert([{
         name: newProduct.title,
         brand: finalBrand,
         price: Number(newProduct.base_price) || 0,
@@ -645,18 +688,24 @@ Support & Login: https://resellbari.com/login
         image_url: imageList[0],
         images: imageList,
         stock: Number(newProduct.stock) || 0
-      }]);
+      }]).select();
 
       if (!error) {
+        // 🚀 নতুন প্রোডাক্টটা সাথে সাথেই লিস্টে দেখাবে - পুরো ডাটা আবার fetch করার জন্য অপেক্ষা করতে হবে না
+        if (data && data[0]) {
+          setProducts(prev => [data[0], ...prev]);
+        }
         setNewProduct({ title: '', brand: '', base_price: '', suggested_price: '', category: '', sub_category: '', description: '', stock: 10 });
         setNewBrandInput('');
         setMediaFiles([]);
-        fetchAdminData();
+        setToast({ type: 'success', message: '✅ Product Added Successfully!' });
       } else {
         console.error('Error adding product:', error.message);
+        setToast({ type: 'error', message: '❌ Failed to add product.' });
       }
     } catch (err) {
       console.error('Upload Error: ' + err.message);
+      setToast({ type: 'error', message: '❌ Upload failed.' });
     } finally { 
       setUploading(false); 
     }
@@ -667,6 +716,7 @@ Support & Login: https://resellbari.com/login
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (!error) {
       setProducts(prev => prev.filter(p => p.id !== id));
+      setToast({ type: 'success', message: 'Product Deleted.' });
     }
   }
 
@@ -680,7 +730,7 @@ Support & Login: https://resellbari.com/login
         finalImages = await Promise.all(editMediaFiles.map(file => handleFileConvert(file)));
       }
 
-      const { error } = await supabase.from('products').update({
+      const { data, error } = await supabase.from('products').update({
         name: editingProduct.name || editingProduct.title,
         brand: editingProduct.brand || null,
         price: Number(editingProduct.price ?? editingProduct.base_price) || 0,
@@ -691,12 +741,15 @@ Support & Login: https://resellbari.com/login
         image_url: finalImages[0] || null,
         images: finalImages,
         stock: Number(editingProduct.stock) || 0
-      }).eq('id', editingProduct.id);
+      }).eq('id', editingProduct.id).select();
 
       if (!error) { 
+        if (data && data[0]) {
+          setProducts(prev => prev.map(p => p.id === data[0].id ? data[0] : p));
+        }
         setEditingProduct(null); 
         setEditMediaFiles([]); 
-        fetchAdminData(); 
+        setToast({ type: 'success', message: '✅ Product Updated!' });
       }
     } catch (err) {
       console.error('Update Error: ' + err.message);
@@ -721,6 +774,7 @@ Support & Login: https://resellbari.com/login
         if (!error) {
           setEditingPkg(null);
           setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
+          setToast({ type: 'success', message: '✅ Package Updated!' });
           fetchAdminData();
         }
       } else {
@@ -733,6 +787,7 @@ Support & Login: https://resellbari.com/login
 
         if (!error) {
           setPkgForm({ name: '', price: '', discount_percent: 0, featureInput: '', features: [] });
+          setToast({ type: 'success', message: '✅ Package Created!' });
           fetchAdminData();
         }
       }
@@ -907,6 +962,22 @@ Support & Login: https://resellbari.com/login
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden relative">
+
+      {/* 🔔 TOAST NOTIFICATION */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-4 right-4 z-[100] px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold ${
+              toast.type === 'success' ? 'bg-emerald-500 text-slate-950' : 'bg-rose-600 text-white'
+            }`}
+          >
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* 📱 MOBILE HEADER */}
       <div className="md:hidden sticky top-0 z-40 bg-slate-900/95 backdrop-blur-xl border-b border-slate-800/80 p-4 flex items-center justify-between shadow-lg">
@@ -1024,7 +1095,7 @@ Support & Login: https://resellbari.com/login
       {/* 🖥️ MAIN CONTENT */}
       <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden">
         
-        {/* HEADER BAR (Hydration Error সমাধান করা হয়েছে) */}
+        {/* HEADER BAR (Hydration Error সমাধান করা হয়েছে) */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
           <div>
             <h2 suppressHydrationWarning className="text-2xl font-black text-white capitalize">
@@ -1555,7 +1626,7 @@ Support & Login: https://resellbari.com/login
                     {paginatedProducts.map((p) => (
                       <div key={p.id} className="p-4 bg-slate-800/40 border border-slate-800 rounded-2xl flex justify-between items-center hover:border-slate-700 transition">
                         <div className="flex items-center gap-4">
-                          <img src={p.image_url || 'https://via.placeholder.com/50'} className="w-14 h-14 rounded-2xl object-cover" alt="" />
+                          <img src={p.image_url || 'https://via.placeholder.com/50'} loading="lazy" decoding="async" className="w-14 h-14 rounded-2xl object-cover" alt="" />
                           <div>
                             <div className="flex items-center gap-2">
                               <h4 className="font-bold text-white text-sm">{p.name || p.title}</h4>
