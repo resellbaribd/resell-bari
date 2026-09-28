@@ -615,7 +615,37 @@ Support & Login: https://resellbari.com/login
 
     const deliveryFee = Number(managingOrder.delivery_charge ?? 60);
     const totalAmount = Number(managingOrder.total_amount || 0);
-    const subtotal = totalAmount - deliveryFee;
+    const discountAmount = Number(managingOrder.discount || 0);
+
+    // 🛒 অর্ডারের সব প্রোডাক্ট (একাধিক থাকলে প্রতিটার আলাদা লাইন)
+    const invoiceItems = Array.isArray(managingOrder.order_items) ? managingOrder.order_items : [];
+    const itemRows = invoiceItems.map((it) => {
+      const q = Number(it.quantity || 1);
+      const unit = Number(it.unit_selling_price ?? it.selling_price ?? 0);
+      const line = Number(it.total_selling ?? unit * q);
+      return { name: esc(it.name || 'Product'), q, unit, line };
+    });
+
+    const subtotal = itemRows.length > 0
+      ? itemRows.reduce((sum, r) => sum + r.line, 0)
+      : totalAmount - deliveryFee + discountAmount;
+    const safeSubtotal = subtotal > 0 ? subtotal : 0;
+
+    const rowsHtml = itemRows.length > 0
+      ? itemRows.map((r) => `
+                <tr>
+                  <td style="text-transform: uppercase;">${r.name}</td>
+                  <td style="text-align: center;">${r.q}</td>
+                  <td style="text-align: right;">৳${r.unit}</td>
+                  <td style="text-align: right;">৳${r.line}</td>
+                </tr>`).join('')
+      : `
+                <tr>
+                  <td style="text-transform: uppercase;">${productName}</td>
+                  <td style="text-align: center;">${quantity}</td>
+                  <td style="text-align: right;">৳${Math.round(safeSubtotal / Math.max(1, quantity))}</td>
+                  <td style="text-align: right;">৳${safeSubtotal}</td>
+                </tr>`;
 
     const invoiceContent = `
       <!DOCTYPE html>
@@ -684,21 +714,18 @@ Support & Login: https://resellbari.com/login
                 <tr>
                   <th>Description</th>
                   <th style="text-align: center;">Qty</th>
-                  <th style="text-align: right;">Selling Price</th>
+                  <th style="text-align: right;">Unit Price</th>
+                  <th style="text-align: right;">Amount</th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td style="text-transform: uppercase;">${productName}</td>
-                  <td style="text-align: center;">${quantity}</td>
-                  <td style="text-align: right;">৳${totalAmount}</td>
-                </tr>
+              <tbody>${rowsHtml}
               </tbody>
             </table>
             <div class="total-section">
               <div class="total-card">
-                <div class="total-row"><span>Subtotal</span><span>৳${subtotal > 0 ? subtotal : 0}</span></div>
+                <div class="total-row"><span>Subtotal</span><span>৳${safeSubtotal}</span></div>
                 <div class="total-row"><span>Delivery Charge</span><span>৳${deliveryFee}</span></div>
+                ${discountAmount > 0 ? `<div class="total-row"><span>Discount</span><span>- ৳${discountAmount}</span></div>` : ''}
                 <div class="total-row grand"><span>Total Amount</span><span>৳${totalAmount}</span></div>
               </div>
             </div>
@@ -2457,10 +2484,92 @@ Support & Login: https://resellbari.com/login
                 />
               </div>
 
+              {/* 🛒 অর্ডারের সব প্রোডাক্টের বিস্তারিত */}
+              {(() => {
+                const items = Array.isArray(managingOrder.order_items) ? managingOrder.order_items : [];
+                const totalPcs = items.length > 0
+                  ? items.reduce((sum, it) => sum + Number(it.quantity || 1), 0)
+                  : Number(managingOrder.quantity || 1);
+                const showSummary = Number(managingOrder.base_price || 0) > 0 || Number(managingOrder.selling_price || 0) > 0;
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        Ordered Products ({items.length > 0 ? items.length : 1})
+                      </h4>
+                      <span className="text-[11px] font-bold text-emerald-400">{totalPcs} Total Pcs</span>
+                    </div>
+
+                    {items.length > 0 ? (
+                      items.map((item, idx) => {
+                        const qty = Number(item.quantity || 1);
+                        const unit = Number(item.unit_selling_price ?? item.selling_price ?? 0);
+                        const lineTotal = Number(item.total_selling ?? unit * qty);
+                        const base = Number(item.base_price || 0);
+                        const lineProfit = Number(item.profit ?? (lineTotal - base * qty));
+                        const thumb = typeof item.image_url === 'string' && item.image_url.startsWith('http') ? item.image_url : '';
+
+                        return (
+                          <div key={idx} className="bg-slate-950 border border-slate-800 p-3 rounded-2xl flex justify-between items-center gap-3 text-xs">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {thumb ? (
+                                <img src={thumb} alt="" loading="lazy" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                              ) : (
+                                <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+                                  {idx + 1}
+                                </span>
+                              )}
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-white text-sm">{item.name}</h5>
+                                <p className="text-slate-400 text-[11px] mt-0.5">
+                                  Qty: <strong className="text-slate-200">{qty} pcs</strong> × Sell: ৳{unit}{' '}
+                                  <span className="text-slate-500">(Wholesale: ৳{base})</span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="block font-bold text-white text-sm">৳{lineTotal}</span>
+                              <span className="block text-[11px] font-bold text-emerald-400">+৳{lineProfit} profit</span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="bg-slate-950 border border-slate-800 p-3 rounded-2xl text-xs">
+                        <h5 className="font-bold text-white text-sm">{managingOrder.product_name || 'General Product'}</h5>
+                        <p className="text-slate-400 text-[11px] mt-0.5">
+                          Qty: <strong className="text-slate-200">{managingOrder.quantity || 1} pcs</strong>
+                        </p>
+                      </div>
+                    )}
+
+                    {showSummary && (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 bg-slate-950/70 border border-slate-800 rounded-2xl p-3 text-[11px]">
+                        <span className="text-slate-500">Total Wholesale Cost</span>
+                        <span className="text-right font-bold text-white">৳{Number(managingOrder.base_price || 0)}</span>
+                        <span className="text-slate-500">Products Selling Price</span>
+                        <span className="text-right font-bold text-white">৳{Number(managingOrder.selling_price || 0)}</span>
+                        {Number(managingOrder.discount || 0) > 0 && (
+                          <>
+                            <span className="text-amber-400">Discount (-)</span>
+                            <span className="text-right font-bold text-amber-400">- ৳{Number(managingOrder.discount)}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                 <div>
                   <span className="text-slate-500 block">Product</span>
-                  <strong className="text-slate-200 text-sm">{managingOrder.product_name || 'General Product'}</strong>
+                  <strong className="text-slate-200 text-sm">
+                    {Array.isArray(managingOrder.order_items) && managingOrder.order_items.length > 1
+                      ? `${managingOrder.order_items.length} products`
+                      : (managingOrder.product_name || 'General Product')}
+                  </strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">Quantity</span>
