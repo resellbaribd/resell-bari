@@ -19,20 +19,28 @@ export default function AdminDashboard() {
   // ১. ডিফল্ট স্টেট 'overview' (Hydration mismatch এড়াতে)
   const [activeTab, setActiveTab] = useState('overview');
 
-  // ২. ব্রাউজারে মাউন্ট হওয়ার পর সেভ থাকা ট্যাব লোড হবে
+  // ২. ব্রাউজারে মাউন্ট হওয়ার পর সেভ থাকা ট্যাব লোড হবে (শুধু F5 রিফ্রেশের সময় কাজে লাগে)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedTab = localStorage.getItem('admin_active_tab');
+      const savedTab = sessionStorage.getItem('admin_active_tab');
       if (savedTab) {
         setActiveTab(savedTab);
       }
     }
+
+    // অন্য পেজে (যেমন Shop Page) চলে গেলে সেভ করা ট্যাব মুছে ফেলা হয়,
+    // তাই ফিরে এলে সবসময় Overview দিয়েই শুরু হবে।
+    return () => {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('admin_active_tab');
+      }
+    };
   }, []);
 
   const changeTab = (tabId) => {
     setActiveTab(tabId);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('admin_active_tab', tabId);
+      sessionStorage.setItem('admin_active_tab', tabId);
     }
     setIsMobileMenuOpen(false);
   };
