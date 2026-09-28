@@ -47,6 +47,10 @@ export default function AdminDashboard() {
 
   // 🔔 Toast Notification (Add/Update/Delete succeed হলে দেখানোর জন্য)
   const [toast, setToast] = useState(null);
+
+  // 🖼️ পুরনো ভারী ছবি Storage-এ সরানোর (একবারের) টুল-এর স্টেট
+  const [migrating, setMigrating] = useState(false);
+  const [migrateProgress, setMigrateProgress] = useState({ done: 0, total: 0, failed: 0 });
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
@@ -224,6 +228,12 @@ export default function AdminDashboard() {
   const availableBrands = useMemo(() => {
     return Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
   }, [products]);
+
+  // কতগুলো প্রোডাক্টের ছবি এখনও পুরনো ভারী (base64) পদ্ধতিতে সেভ আছে
+  const oldImageCount = useMemo(
+    () => products.filter(p => typeof p.image_url === 'string' && p.image_url.startsWith('data:')).length,
+    [products]
+  );
 
   // 📄 পেজিনেশন হিসাব
   const totalProductPages = Math.ceil(products.length / productsPerPage) || 1;
@@ -578,12 +588,21 @@ Support & Login: https://resellbari.com/login
     if (!managingOrder) return;
     const printWindow = window.open('', '_blank');
     
-    const storeName = managingOrder.seller_name || 'Resell Bari';
-    const storePhone = managingOrder.seller_phone || '';
-    const storeLogo = managingOrder.seller_logo || '';
+    // 🛡️ Security: কাস্টমার/সেলারের লেখা টেক্সট যেন কোড হিসেবে চলতে না পারে
+    const esc = (v) => String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const storeName = esc(managingOrder.seller_name || 'Resell Bari');
+    const storePhone = esc(managingOrder.seller_phone || '');
+    const rawLogo = String(managingOrder.seller_logo || '').trim();
+    const storeLogo = /^(https?:\/\/|data:image\/)/i.test(rawLogo) ? esc(rawLogo) : '';
 
     const numericInvoiceId = managingOrder.id ? String(managingOrder.id).replace(/\D/g, '').slice(-5) || '69120' : '69120';
-    const productName = managingOrder.product_name || 'Product Item';
+    const productName = esc(managingOrder.product_name || 'Product Item');
     const quantity = Number(managingOrder.quantity || 1);
 
     const deliveryFee = Number(managingOrder.delivery_charge ?? 60);
@@ -636,15 +655,15 @@ Support & Login: https://resellbari.com/login
                 <div class="store-phone">Contact: ${storePhone}</div>
               </div>
             </div>
-            <div class="invoice-badge">${managingOrder.status || 'Confirmed'}</div>
+            <div class="invoice-badge">${esc(managingOrder.status || 'Confirmed')}</div>
           </div>
           <div class="content-body">
             <div class="info-grid">
               <div class="info-card">
                 <h4>Customer Details</h4>
-                <p>👤 ${managingOrder.customer_name || 'N/A'}</p>
-                <p>📞 ${managingOrder.customer_phone || 'N/A'}</p>
-                <p>📍 ${managingOrder.delivery_address || 'N/A'}</p>
+                <p>👤 ${esc(managingOrder.customer_name || 'N/A')}</p>
+                <p>📞 ${esc(managingOrder.customer_phone || 'N/A')}</p>
+                <p>📍 ${esc(managingOrder.delivery_address || 'N/A')}</p>
               </div>
               <div class="info-card">
                 <h4>Invoice Summary</h4>
@@ -727,6 +746,121 @@ Support & Login: https://resellbari.com/login
       setToast({ type: 'error', message: '❌ Upload failed.' });
     } finally { 
       setUploading(false); 
+    }
+  }
+
+  // 🖼️ ONE-TIME: পুরনো ভারী (base64) ছবি Supabase Storage-এ সরিয়ে শুধু লিংক সেভ করা
+  const uploadDataUrlToStorage = async (dataUrl, label) => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const mime = blob.type || 'image/jpeg';
+    const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
+    const path = `migrated/${label}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('product-images')
+      .upload(path, blob, { contentType: mime, cacheControl: '31536000', upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from('product-images').getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  // আপলোড হওয়া ছবিটা সত্যিই ব্রাউজারে খোলে কিনা যাচাই (ডাটাবেজ বদলানোর আগে)
+  const verifyImageLoads = (url) =>
+    new Promise((resolve) => {
+      const img = new Image();
+      const timer = setTimeout(() => resolve(false), 20000);
+      img.onload = () => { clearTimeout(timer); resolve(true); };
+      img.onerror = () => { clearTimeout(timer); resolve(false); };
+      img.src = url;
+    });
+
+  async function handleOptimizeImages() {
+    if (migrating) return;
+    if (!confirm('পুরনো ভারী ছবিগুলো Storage-এ সরানো হবে। এতে কয়েক মিনিট লাগতে পারে। কাজ চলাকালীন এই পেজ বন্ধ বা রিলোড করবেন না। শুরু করবেন?')) return;
+
+    setMigrating(true);
+    setMigrateProgress({ done: 0, total: 0, failed: 0 });
+
+    let done = 0;
+    let failed = 0;
+    let lastError = '';
+
+    try {
+      // শুধু আইডিগুলো আনা হচ্ছে (হালকা), ছবি নয়
+      const { data: idRows, error: idErr } = await supabase
+        .from('products')
+        .select('id')
+        .like('image_url', 'data:%');
+      if (idErr) throw idErr;
+
+      const ids = (idRows || []).map(r => r.id);
+      setMigrateProgress({ done: 0, total: ids.length, failed: 0 });
+
+      for (const id of ids) {
+        try {
+          const { data: row, error: rowErr } = await supabase
+            .from('products')
+            .select('id, image_url, images')
+            .eq('id', id)
+            .single();
+          if (rowErr) throw rowErr;
+
+          const sources = Array.isArray(row.images) && row.images.length > 0 ? row.images : [row.image_url];
+
+          const resolved = [];
+          for (let i = 0; i < sources.length; i++) {
+            const src = sources[i];
+            if (typeof src === 'string' && src.startsWith('data:')) {
+              resolved.push(await uploadDataUrlToStorage(src, `${id}-${i}`));
+            } else {
+              resolved.push(src || null);
+            }
+          }
+
+          let mainUrl = row.image_url;
+          if (typeof mainUrl === 'string' && mainUrl.startsWith('data:')) {
+            const idx = sources.indexOf(mainUrl);
+            mainUrl = idx >= 0 ? resolved[idx] : await uploadDataUrlToStorage(mainUrl, `${id}-main`);
+          }
+
+          const finalImages = resolved.filter(Boolean);
+          const finalMain = mainUrl || finalImages[0] || null;
+
+          // ✅ ডাটাবেজ বদলানোর আগে নিশ্চিত হই নতুন লিংকে ছবি সত্যিই খোলে
+          if (finalMain && !(await verifyImageLoads(finalMain))) {
+            throw new Error('Uploaded image could not be opened (bucket public কিনা দেখুন)');
+          }
+
+          const updatePayload = { image_url: finalMain };
+          if (finalImages.length > 0) updatePayload.images = finalImages;
+
+          const { error: updErr } = await supabase.from('products').update(updatePayload).eq('id', id);
+          if (updErr) throw updErr;
+
+          done += 1;
+        } catch (err) {
+          console.error('Image optimize failed for product', id, err);
+          failed += 1;
+          lastError = err?.message || String(err);
+          // পরপর ৩টা ব্যর্থ হলে থামিয়ে দেওয়া (সম্ভবত পারমিশন/সেটিংয়ের সমস্যা)
+          if (failed >= 3 && done === 0) break;
+        }
+        setMigrateProgress({ done, total: ids.length, failed });
+      }
+
+      if (failed === 0) {
+        setToast({ type: 'success', message: `✅ ${done}টি প্রোডাক্টের ছবি অপ্টিমাইজ হয়েছে!` });
+      } else {
+        setToast({ type: 'error', message: `${done}টি সফল, ${failed}টি ব্যর্থ: ${lastError}` });
+      }
+    } catch (err) {
+      console.error('Optimize error:', err);
+      setToast({ type: 'error', message: 'Optimize করা যায়নি: ' + (err?.message || err) });
+    } finally {
+      setMigrating(false);
+      fetchAdminData();
     }
   }
 
@@ -1634,6 +1768,23 @@ Support & Login: https://resellbari.com/login
                   <h3 className="text-lg font-bold text-white">Inventory Catalogue ({products.length})</h3>
                   <span className="text-xs text-slate-400 font-mono">Page {productPage} of {totalProductPages}</span>
                 </div>
+
+                {oldImageCount > 0 && (
+                  <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold text-amber-400">🖼️ {oldImageCount}টি প্রোডাক্টের ছবি পুরনো ভারী পদ্ধতিতে সেভ আছে</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">এগুলো Storage-এ সরালে Inventory ও Seller-দের পেজ অনেক দ্রুত হবে (একবারের কাজ, নিরাপদ)।</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOptimizeImages}
+                      disabled={migrating}
+                      className="shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl transition cursor-pointer disabled:opacity-60"
+                    >
+                      {migrating ? `Optimizing... ${migrateProgress.done}/${migrateProgress.total}` : '⚡ Optimize Old Images'}
+                    </button>
+                  </div>
+                )}
 
                 {loading ? (
                   <div className="space-y-3">
