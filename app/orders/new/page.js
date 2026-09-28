@@ -10,6 +10,8 @@ export default function CreateOrderPage() {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState(null);
   const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState('');
   
   // Custom Alert / Feedback Modal State
   const [modalFeedback, setModalFeedback] = useState({
@@ -48,28 +50,36 @@ export default function CreateOrderPage() {
 
   async function fetchInitialData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // ⚡ getSession লোকাল থেকে পড়ে (network call লাগে না)
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         router.push('/login');
         return;
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      setProfile(profileData);
+      // ⚡ Profile ও Products একসাথে (parallel) আনা হচ্ছে।
+      // Products-এ শুধু দরকারি কলাম আনা হচ্ছে (আগে select('*') এ সব ভারী ছবির ডাটা আসতো)
+      const [profileRes, productRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase
+          .from('products')
+          .select('id, name, price, suggested_price, category, sub_category, image_url')
+          .order('name', { ascending: true })
+      ]);
 
-      const { data: productData } = await supabase
-        .from('products')
-        .select('*')
-        .order('name', { ascending: true });
-      
-      if (productData) setProducts(productData);
+      setProfile(profileRes.data);
+
+      if (productRes.error) {
+        console.error('Products load error:', productRes.error);
+        setProductsError(productRes.error.message || 'Unknown error');
+      }
+      if (productRes.data) setProducts(productRes.data);
     } catch (err) {
       console.error('Error fetching data:', err);
+      setProductsError(err?.message || 'Unknown error');
+    } finally {
+      setProductsLoading(false);
     }
   }
 
@@ -127,10 +137,17 @@ export default function CreateOrderPage() {
       return showNotice('Invalid Selling Price', 'Please enter a valid customer selling price.', 'warning');
     }
 
+    // 🖼️ বড় (base64) ছবি অর্ডারের ভেতরে সেভ করা হবে না — এতে প্রতিটা অর্ডার অনেক ভারী হয়ে যেত।
+    // শুধু সাধারণ ছবির লিংক (http...) থাকলে সেটা রাখা হবে।
+    const safeImageUrl =
+      typeof selectedProduct.image_url === 'string' && selectedProduct.image_url.startsWith('http')
+        ? selectedProduct.image_url
+        : '';
+
     const newItem = {
       product_id: selectedProduct.id,
       name: selectedProduct.name,
-      image_url: selectedProduct.image_url || selectedProduct.images?.[0] || '',
+      image_url: safeImageUrl,
       base_price: Number(selectedProduct.price || 0),
       quantity: qty,
       unit_selling_price: unitSellPrice,
@@ -364,7 +381,13 @@ export default function CreateOrderPage() {
 
                 {/* Live Search Items */}
                 <div className="max-h-44 overflow-y-auto space-y-1.5 pt-2 border-t border-slate-800/80 pr-1">
-                  {filteredProducts.length === 0 ? (
+                  {productsLoading ? (
+                    <p className="text-xs text-slate-400 py-3 text-center animate-pulse">Products লোড হচ্ছে...</p>
+                  ) : productsError ? (
+                    <p className="text-xs text-rose-400 py-3 text-center">
+                      ⚠️ Products লোড করা যায়নি: {productsError}
+                    </p>
+                  ) : filteredProducts.length === 0 ? (
                     <p className="text-xs text-slate-500 py-3 text-center">No products found.</p>
                   ) : (
                     filteredProducts.map(p => {
@@ -381,8 +404,10 @@ export default function CreateOrderPage() {
                         >
                           <div className="flex items-center gap-2.5">
                             <img 
-                              src={p.image_url || p.images?.[0] || 'https://via.placeholder.com/40'} 
+                              src={p.image_url || 'https://via.placeholder.com/40'} 
                               alt={p.name} 
+                              loading="lazy"
+                              decoding="async"
                               className="w-9 h-9 rounded-lg object-cover"
                             />
                             <div>
