@@ -16,10 +16,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sendEmailNotification } from '@/lib/email';
 
 export default function AdminDashboard() {
-  // ১. ডিফল্ট স্টেট 'overview' (Hydration mismatch এড়াতে)
   const [activeTab, setActiveTab] = useState('overview');
 
-  // ২. ব্রাউজারে মাউন্ট হওয়ার পর সেভ থাকা ট্যাব লোড হবে
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTab = localStorage.getItem('admin_active_tab');
@@ -45,7 +43,7 @@ export default function AdminDashboard() {
   const [activationRequests, setActivationRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔔 Toast Notification (Add/Update/Delete succeed হলে দেখানোর জন্য)
+  // 🔔 Toast Notification
   const [toast, setToast] = useState(null);
   useEffect(() => {
     if (!toast) return;
@@ -53,15 +51,14 @@ export default function AdminDashboard() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // 🚦 Fetch Lock (একসাথে একাধিকবার fetchAdminData চলা আটকানোর জন্য - স্পিড ফিক্স)
+  // 🚦 Fetch Lock
   const fetchLockRef = useRef(false);
   const pendingRefetchRef = useRef(false);
 
-  // 📄 Inventory Pagination State (প্রতি পেজে ১০টি প্রোডাক্ট)
+  // 📄 Inventory Pagination State (১০টি করে)
   const [productPage, setProductPage] = useState(1);
   const productsPerPage = 10;
 
-  // 🛡️ Admin Emails List (Protected)
   const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com'];
 
   const [selectedOrderIds, setSelectedOrderIds] = useState([]);
@@ -136,8 +133,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchAdminData();
 
-    // ⏱️ Debounce: একসাথে অনেকগুলো DB change event এলে বারবার fetch না করে
-    // ৫০০ms অপেক্ষা করে একবারেই fetch করবে (স্পিড ফিক্স)
     let debounceTimer = null;
     const debouncedFetch = () => {
       clearTimeout(debounceTimer);
@@ -153,10 +148,7 @@ export default function AdminDashboard() {
     return () => { clearTimeout(debounceTimer); supabase.removeChannel(channel); };
   }, []);
 
-  // 🚀 Fast & Optimized Fetch (লোড স্পিড বাড়ানোর জন্য অপ্টিমাইজড)
   async function fetchAdminData() {
-    // 🚦 যদি ইতিমধ্যে একটা fetch চলছে, তাহলে নতুন করে শুরু না করে
-    // "পরে আরেকবার fetch করো" এই সিগন্যাল রেখে দেই। এতে ডাবল/ট্রিপল ফুল-রিফেচ বন্ধ হবে।
     if (fetchLockRef.current) {
       pendingRefetchRef.current = true;
       return;
@@ -212,7 +204,6 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
       fetchLockRef.current = false;
-      // 🚦 fetch চলাকালীন যদি আরেকটা রিফেচ রিকোয়েস্ট জমা হয়ে থাকে, এখন সেটা চালাও
       if (pendingRefetchRef.current) {
         pendingRefetchRef.current = false;
         fetchAdminData();
@@ -220,19 +211,16 @@ export default function AdminDashboard() {
     }
   }
 
-  // ডাইনামিক ব্র্যান্ড তালিকা
   const availableBrands = useMemo(() => {
     return Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
   }, [products]);
 
-  // 📄 পেজিনেশন হিসাব
   const totalProductPages = Math.ceil(products.length / productsPerPage) || 1;
   const paginatedProducts = useMemo(() => {
     const start = (productPage - 1) * productsPerPage;
     return products.slice(start, start + productsPerPage);
   }, [products, productPage]);
 
-  // 🛡️ Staff Creation
   async function handleCreateStaff(e) {
     e.preventDefault();
     if (!staffForm.email || !staffForm.password) return alert('Email & password are required');
@@ -310,75 +298,70 @@ export default function AdminDashboard() {
     }
   }
 
-  // 💳 Payment Actions
+  // 💳 Payment Actions (Updated & Safe: updated_at removed)
   async function handleApprovePayment(request) {
     if (!confirm(`Are you sure you want to approve payment for ${request.email} (${request.plan})?`)) return;
     setPaymentActionLoading(request.id);
     
     try {
+      // ১. activation_requests টেবিলে শুধুমাত্র status আপডেট
       const { error: reqErr } = await supabase
         .from('activation_requests')
-        .update({ status: 'approved', updated_at: new Date() })
+        .update({ status: 'approved' })
         .eq('id', request.id);
 
       if (reqErr) throw reqErr;
 
+      // ২. প্ল্যান নাম ক্লিন করা
       const rawPlan = request.plan?.toLowerCase() || 'basic';
       let cleanPlan = 'basic';
       if (rawPlan.includes('advance')) cleanPlan = 'advance';
       else if (rawPlan.includes('premium')) cleanPlan = 'premium';
 
-      let profileUpdated = false;
-
+      // ৩. প্রোফাইল আপডেট
       if (request.user_id) {
-        const { data: updatedByUid } = await supabase
-          .from('profiles')
-          .update({
-            plan: cleanPlan,
-            status: 'active',
-            updated_at: new Date()
-          })
-          .eq('id', request.user_id)
-          .select();
-        
-        if (updatedByUid && updatedByUid.length > 0) {
-          profileUpdated = true;
-        }
-      }
-
-      if (!profileUpdated && request.email) {
-        const cleanEmail = request.email.trim().toLowerCase();
         await supabase
           .from('profiles')
           .update({
             plan: cleanPlan,
-            status: 'active',
-            updated_at: new Date()
+            status: 'active'
           })
-          .eq('email', cleanEmail);
+          .eq('id', request.user_id);
+      } else if (request.email) {
+        await supabase
+          .from('profiles')
+          .update({
+            plan: cleanPlan,
+            status: 'active'
+          })
+          .eq('email', request.email.trim().toLowerCase());
       }
 
+      // ৪. ইমেইল পাঠানোর চেষ্টা (ফেল করলেও এপ্রুভ আটকে থাকবে না)
       if (request.email) {
-        const emailBody = `
+        try {
+          const emailBody = `
 Congratulations! Your Resell Bari Membership has been Activated!
 Plan: ${request.plan}
 Amount: ${request.amount}
 Transaction ID: ${request.transaction_id}
 Dashboard Login: https://resellbari.com/login
-        `;
-
-        await sendEmailNotification({
-          to_email: request.email,
-          subject: '🎉 Congratulations! Your Resell Bari Membership is Active',
-          message: emailBody,
-        });
+          `;
+          await sendEmailNotification({
+            to_email: request.email,
+            subject: '🎉 Congratulations! Your Resell Bari Membership is Active',
+            message: emailBody,
+          });
+        } catch (emailErr) {
+          console.warn('Email sending failed, but payment was approved:', emailErr);
+        }
       }
 
-      setToast({ type: 'success', message: '✅ Payment Approved!' });
+      setToast({ type: 'success', message: '✅ Payment Approved & Account Activated!' });
       fetchAdminData();
     } catch (err) {
       console.error('Error approving payment: ' + err.message);
-      setToast({ type: 'error', message: 'Failed to approve payment.' });
+      setToast({ type: 'error', message: 'Failed: ' + (err.message || 'Database error') });
     } finally {
       setPaymentActionLoading(null);
     }
@@ -391,6 +374,7 @@ Dashboard Login: https://resellbari.com/login
     setPaymentActionLoading(request.id);
 
     try {
+      // activation_requests টেবিলে শুধুমাত্র status এবং decline_reason আপডেট
       const { error } = await supabase
         .from('activation_requests')
         .update({ 
@@ -402,18 +386,21 @@ Dashboard Login: https://resellbari.com/login
       if (error) throw error;
 
       if (request.email) {
-        const declineBody = `
+        try {
+          const declineBody = `
 Hello,
 Your membership activation payment request for the ${request.plan} plan has been declined.
 Reason: "${paymentDeclineReason}"
 Support & Login: https://resellbari.com/login
-        `;
-
-        await sendEmailNotification({
-          to_email: request.email,
-          subject: '⚠️ Resell Bari Membership Payment Status Update',
-          message: declineBody,
-        });
+          `;
+          await sendEmailNotification({
+            to_email: request.email,
+            subject: '⚠️ Resell Bari Membership Payment Status Update',
+            message: declineBody,
+          });
+        } catch (emailErr) {
+          console.warn('Decline email failed:', emailErr);
+        }
       }
 
       setDecliningPaymentReq(null);
@@ -422,6 +409,7 @@ Support & Login: https://resellbari.com/login
       fetchAdminData();
     } catch (err) {
       console.error('Error declining payment: ' + err.message);
+      setToast({ type: 'error', message: 'Failed: ' + err.message });
     } finally {
       setPaymentActionLoading(null);
     }
@@ -434,17 +422,6 @@ Support & Login: https://resellbari.com/login
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleFileConvert = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file);
-    });
-  };
-
-  // 🖼️ Supabase Storage তে ছবি আপলোড করে পাবলিক URL রিটার্ন করে
-  // (আগের base64 পদ্ধতির বদলে - এটাই ডাটাবেজকে হালকা ও দ্রুত রাখে)
   const handleImageUpload = async (file) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
@@ -540,7 +517,6 @@ Support & Login: https://resellbari.com/login
   const handleSelectOrder = (id) => setSelectedOrderIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   const handleSelectAllOrders = () => setSelectedOrderIds(selectedOrderIds.length === orders.length ? [] : orders.map(o => o.id));
 
-  // ⚙️ Save Full Order Details
   async function handleSaveOrderDetails(e) {
     e.preventDefault();
     setUpdateOrderLoading(true);
@@ -685,7 +661,6 @@ Support & Login: https://resellbari.com/login
     printWindow.document.close();
   };
 
-  // 🌟 Add Product (Instant Show + Success Notice)
   async function handleAddProduct(e) {
     e.preventDefault();
     if (mediaFiles.length === 0) return alert('Please select at least one product image!');
@@ -710,7 +685,6 @@ Support & Login: https://resellbari.com/login
       }]).select();
 
       if (!error) {
-        // 🚀 নতুন প্রোডাক্টটা সাথে সাথেই লিস্টে দেখাবে - পুরো ডাটা আবার fetch করার জন্য অপেক্ষা করতে হবে না
         if (data && data[0]) {
           setProducts(prev => [data[0], ...prev]);
         }
@@ -739,7 +713,6 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 🌟 Update Product
   async function handleUpdateProduct(e) {
     e.preventDefault();
     setEditUploading(true);
@@ -777,7 +750,6 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // Package Handlers
   async function handleSavePackage(e) {
     e.preventDefault();
     setSavingPkg(true);
@@ -823,7 +795,6 @@ Support & Login: https://resellbari.com/login
     if (!error) setPackages(packages.filter(p => p.id !== id));
   }
 
-  // 🚫 Seller Ban Handler
   async function handleBanSeller(e) {
     e.preventDefault();
     if (!banForm.reason.trim()) return;
@@ -884,7 +855,6 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 🗑️ Permanent Delete Seller Profile
   async function handleDeleteSellerProfile(sellerId, sellerName) {
     if (!confirm(`⚠️ PERMANENT TERMINATION WARNING:\n\nAre you sure you want to completely delete reseller "${sellerName}"?\nThis action cannot be undone.`)) return;
     
@@ -903,7 +873,6 @@ Support & Login: https://resellbari.com/login
     }
   }
 
-  // 👥 Filter & Map Full Reseller Profiles
   const sellersList = useMemo(() => {
     const sellerMap = {};
     profiles
@@ -1114,7 +1083,7 @@ Support & Login: https://resellbari.com/login
       {/* 🖥️ MAIN CONTENT */}
       <main className="flex-1 p-4 sm:p-8 md:p-10 w-full min-h-screen overflow-x-hidden">
         
-        {/* HEADER BAR (Hydration Error সমাধান করা হয়েছে) */}
+        {/* HEADER BAR */}
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full shadow-lg">
           <div>
             <h2 suppressHydrationWarning className="text-2xl font-black text-white capitalize">
@@ -1306,8 +1275,20 @@ Support & Login: https://resellbari.com/login
                         <td className="p-4 text-right">
                           {req.status === 'pending' ? (
                             <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => handleApprovePayment(req)} disabled={paymentActionLoading === req.id} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer shadow-md">Confirm</button>
-                              <button onClick={() => { setDecliningPaymentReq(req); setPaymentDeclineReason(''); }} disabled={paymentActionLoading === req.id} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer">Decline</button>
+                              <button 
+                                onClick={() => handleApprovePayment(req)} 
+                                disabled={paymentActionLoading === req.id} 
+                                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer shadow-md disabled:opacity-50"
+                              >
+                                {paymentActionLoading === req.id ? 'Processing...' : 'Confirm'}
+                              </button>
+                              <button 
+                                onClick={() => { setDecliningPaymentReq(req); setPaymentDeclineReason(''); }} 
+                                disabled={paymentActionLoading === req.id} 
+                                className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-4 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer"
+                              >
+                                Decline
+                              </button>
                             </div>
                           ) : (
                             <span className="text-slate-500 text-xs italic">Completed</span>
@@ -1682,7 +1663,6 @@ Support & Login: https://resellbari.com/login
                 )}
               </div>
 
-              {/* 📄 Pagination Controls */}
               {totalProductPages > 1 && (
                 <div className="flex justify-between items-center pt-6 border-t border-slate-800 mt-4">
                   <button

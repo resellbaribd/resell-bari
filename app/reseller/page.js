@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,32 +30,59 @@ export default function ResellerDashboard() {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  useEffect(() => {
-    fetchProfileAndOrders();
-    fetchPackages();
+  // 🚦 Fetch Lock (একসাথে একাধিক fetch চলা আটকানোর জন্য - স্পিড ফিক্স)
+  const fetchLockRef = useRef(false);
+  const pendingRefetchRef = useRef(false);
+  const initialLoadDoneRef = useRef(false);
 
-    const channel = supabase
-      .channel('schema-db-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          fetchProfileAndOrders();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles' },
-        () => {
-          fetchProfileAndOrders();
-        }
-      )
-      .subscribe();
+  useEffect(() => {
+    let channel = null;
+    let debounceTimer = null;
+    let cancelled = false;
+
+    fetchProfileAndOrders();
+
+    // ⏱️ Debounce: একসাথে অনেক change এলে ৫০০ms অপেক্ষা করে একবারই fetch করবে
+    const debouncedFetch = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fetchProfileAndOrders, 500);
+    };
+
+    // 🎯 শুধু এই seller-এর নিজের order/profile change হলেই refresh হবে
+    // (আগে অন্য সবার change এও সবার dashboard বারবার reload হতো)
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid || cancelled) return;
+
+      channel = supabase
+        .channel(`reseller-changes-${uid}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders', filter: `reseller_id=eq.${uid}` },
+          debouncedFetch
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` },
+          debouncedFetch
+        )
+        .subscribe();
+    })();
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      clearTimeout(debounceTimer);
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
+
+  // 📦 Packages শুধু তখনই লোড হবে যখন Package modal খোলা হবে (শুরুতে অকারণে লোড হতো)
+  useEffect(() => {
+    if (showPkgModal && packages.length === 0) {
+      fetchPackages();
+    }
+  }, [showPkgModal]);
 
   // 🔴 Real-time Ban Countdown Timer Logic
   useEffect(() => {
@@ -85,74 +112,86 @@ export default function ResellerDashboard() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [profile]);
+  }, [profile?.is_banned, profile?.ban_expires_at]);
 
   async function fetchProfileAndOrders() {
+    // 🚦 ইতিমধ্যে fetch চললে নতুন করে শুরু না করে, শেষ হলে আরেকবার চালানোর সিগন্যাল রাখি
+    if (fetchLockRef.current) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    fetchLockRef.current = true;
+
     try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      // শুধু প্রথমবার skeleton দেখাবে, পরের refresh গুলোতে স্ক্রিন ঝলকাবে না
+      if (!initialLoadDoneRef.current) setLoading(true);
+
+      // ⚡ getSession লোকাল থেকে পড়ে (network call লাগে না) - getUser এর চেয়ে দ্রুত
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) {
         router.replace('/login');
         return;
       }
 
-      let { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
+      // ⚡ Profile ও Orders একসাথে (parallel) আনা হচ্ছে - আগে একটার পর একটা আনা হতো
+      const [profileRes, ordersRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        supabase.from('orders').select('*').eq('reseller_id', user.id).order('created_at', { ascending: false })
+      ]);
+
+      let profileData = profileRes.data;
+      const ordersData = ordersRes.data;
 
       const userEmail = (user.email || '').toLowerCase();
       const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com', 'info.resellbari@gmail.com'];
       const isAdmin = SUPER_ADMINS.includes(userEmail) || profileData?.role?.toLowerCase() === 'admin';
 
       if (!isAdmin) {
-        const { data: approvedReq } = await supabase
-          .from('activation_requests')
-          .select('status, plan')
-          .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
-          .eq('status', 'approved')
-          .limit(1)
-          .maybeSingle();
-
         const validPlans = ['basic', 'advance', 'premium'];
         const currentPlanName = profileData?.plan ? profileData.plan.toLowerCase().trim() : null;
         const hasValidPlan = currentPlanName && validPlans.includes(currentPlanName);
         const isActive = profileData?.status === 'active';
 
-        if ((!hasValidPlan || !isActive) && approvedReq) {
-          const rawPlan = approvedReq.plan?.toLowerCase() || 'basic';
-          let cleanPlan = 'basic';
-          if (rawPlan.includes('advance')) cleanPlan = 'advance';
-          else if (rawPlan.includes('premium')) cleanPlan = 'premium';
+        // ⚡ activation_requests শুধু তখনই চেক হবে যখন প্ল্যান/স্ট্যাটাস ঠিক নেই
+        // (আগে প্রতিবার অকারণে এই query চলতো)
+        if (!hasValidPlan || !isActive) {
+          const { data: approvedReq } = await supabase
+            .from('activation_requests')
+            .select('status, plan')
+            .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
+            .eq('status', 'approved')
+            .limit(1)
+            .maybeSingle();
 
-          await supabase
-            .from('profiles')
-            .update({
+          if (approvedReq) {
+            const rawPlan = approvedReq.plan?.toLowerCase() || 'basic';
+            let cleanPlan = 'basic';
+            if (rawPlan.includes('advance')) cleanPlan = 'advance';
+            else if (rawPlan.includes('premium')) cleanPlan = 'premium';
+
+            await supabase
+              .from('profiles')
+              .update({
+                plan: cleanPlan,
+                status: 'active',
+                updated_at: new Date()
+              })
+              .eq('id', user.id);
+
+            profileData = {
+              ...profileData,
               plan: cleanPlan,
-              status: 'active',
-              updated_at: new Date()
-            })
-            .eq('id', user.id);
-
-          profileData = {
-            ...profileData,
-            plan: cleanPlan,
-            status: 'active'
-          };
-        } else if (!hasValidPlan || !isActive) {
-          router.replace('/account-activation');
-          return;
+              status: 'active'
+            };
+          } else {
+            router.replace('/account-activation');
+            return;
+          }
         }
       }
 
       setProfile(profileData);
-
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('reseller_id', user.id)
-        .order('created_at', { ascending: false });
 
       if (ordersData) {
         setOrders(ordersData);
@@ -168,7 +207,14 @@ export default function ResellerDashboard() {
     } catch (err) {
       console.error('Data Load Error:', err);
     } finally {
+      initialLoadDoneRef.current = true;
       setLoading(false);
+      fetchLockRef.current = false;
+      // fetch চলাকালীন যদি আরেকটা রিকোয়েস্ট জমা হয়ে থাকে, এখন সেটা চালাও
+      if (pendingRefetchRef.current) {
+        pendingRefetchRef.current = false;
+        fetchProfileAndOrders();
+      }
     }
   }
 
