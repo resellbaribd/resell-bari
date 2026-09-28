@@ -122,6 +122,7 @@ export default function AccountActivationPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [copied, setCopied] = useState(false);
 
   const [method, setMethod] = useState("bKash");
@@ -150,14 +151,7 @@ export default function AccountActivationPage() {
         const currentUser = session.user;
         setUser(currentUser);
 
-        // ১. অ্যাডমিনদের সরাসরি অ্যাডমিন প্যানেলে পাঠানো
-        const SUPER_ADMINS = ['admin@resellbari.com', 'admin@bbc.com', 'sujanmiah.info@gmail.com', 'info.resellbari@gmail.com'];
-        if (SUPER_ADMINS.includes(currentUser.email?.toLowerCase())) {
-          router.replace("/admin");
-          return;
-        }
-
-        // ২. প্রোফাইল স্ট্যাটাস চেক
+        // ১. প্রোফাইল স্ট্যাটাস চেক (অ্যাডমিন হলে ডাটাবেসের role দেখে অ্যাডমিন প্যানেলে পাঠানো)
         const { data: profile } = await supabase
           .from("profiles")
           .select("role, plan, status")
@@ -169,7 +163,7 @@ export default function AccountActivationPage() {
           return;
         }
 
-        // ৩. রিকোয়েস্টে অলরেডি অনুমোদিত (approved) আছে কিনা চেক
+        // ২. রিকোয়েস্টে অলরেডি অনুমোদিত (approved) আছে কিনা চেক
         const { data: approvedReq } = await supabase
           .from("activation_requests")
           .select("status, plan")
@@ -209,7 +203,7 @@ export default function AccountActivationPage() {
     checkUserAndMembership();
   }, [router]);
 
-  // 🔴 রিয়েল-টাইম লিসেনার: ইউজার অপেক্ষা করার সময় অ্যাডমিন প্যানেল থেকে Approve হলে স্বয়ংক্রিয় রিডাইরেক্ট
+  // 🔴 রিয়েল-টাইম লিসেনার: ইউজার অপেক্ষা করার সময় অ্যাডমিন প্যানেল থেকে Approve হলে স্বয়ংক্রিয় রিডাইরেক্ট
   useEffect(() => {
     if (!user) return;
 
@@ -268,6 +262,7 @@ export default function AccountActivationPage() {
 
   const handlePlanSelect = (name, price) => {
     setSelectedPlan({ name, price });
+    setSubmitError("");
     setIsModalOpen(true);
   };
 
@@ -280,6 +275,7 @@ export default function AccountActivationPage() {
   const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    setSubmitError("");
 
     try {
       const { error } = await supabase.from("activation_requests").insert([
@@ -297,13 +293,20 @@ export default function AccountActivationPage() {
       ]);
 
       if (error) {
-        console.error("Supabase insert warning:", error);
+        // ❌ আগে এখানে error হলেও "সফল" দেখানো হতো, ফলে টাকা পাঠিয়েও request হারিয়ে যেত।
+        console.error("Supabase insert error:", error);
+        setSubmitError(
+          "আপনার পেমেন্ট তথ্য জমা হয়নি। অনুগ্রহ করে আবার চেষ্টা করুন। সমস্যা থাকলে Transaction ID সহ আমাদের সাপোর্টে যোগাযোগ করুন।"
+        );
+        return;
       }
 
       setIsSubmitted(true);
     } catch (err) {
       console.error("Submission error:", err);
-      setIsSubmitted(true);
+      setSubmitError(
+        "আপনার পেমেন্ট তথ্য জমা হয়নি। অনুগ্রহ করে আবার চেষ্টা করুন। সমস্যা থাকলে Transaction ID সহ আমাদের সাপোর্টে যোগাযোগ করুন।"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -632,6 +635,12 @@ export default function AccountActivationPage() {
                     className="w-full text-sm text-stone-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-emerald-50 file:text-emerald-800 hover:file:bg-emerald-100 cursor-pointer"
                   />
                 </div>
+
+                {submitError && (
+                  <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 leading-relaxed">
+                    ⚠️ {submitError}
+                  </div>
+                )}
 
                 <button
                   type="submit"

@@ -292,7 +292,9 @@ export default function ResellerDashboard() {
 
   const isEligibleForBlink = currentPlan === 'basic' || currentPlan === 'advance';
   const userAvatar = profile?.avatar_url || profile?.image_url || profile?.photo_url || profile?.profile_image;
-  const isBanned = profile?.is_banned;
+  // ⏳ সীমিত সময়ের ban-এর মেয়াদ শেষ হলে আর ban ধরা হবে না (ঝাপসা পর্দাও সরে যাবে)
+  const banExpired = !!profile?.ban_expires_at && new Date(profile.ban_expires_at).getTime() <= Date.now();
+  const isBanned = !!profile?.is_banned && !banExpired;
 
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 font-sans flex flex-col md:flex-row w-full overflow-x-hidden">
