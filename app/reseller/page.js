@@ -539,7 +539,7 @@ export default function ResellerDashboard() {
               {holdOrders.map(o => (
                 <div key={o.id} className="bg-slate-900/80 border border-rose-900/50 p-3.5 rounded-2xl flex justify-between items-center text-xs">
                   <div>
-                    <span className="font-mono text-slate-400">Order #{o.id.substring(0, 8)}:</span>
+                    <span className="font-mono text-slate-400">Order #{String(o.id).substring(0, 8)}:</span>
                     <span className="ml-2 font-semibold text-rose-300">"{o.payout_hold_reason || 'Information needs verification'}"</span>
                   </div>
                   <Link href="/profile?tab=payment" className="text-amber-400 underline font-medium">Update Info</Link>
