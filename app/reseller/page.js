@@ -290,7 +290,8 @@ export default function ResellerDashboard() {
     premium: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold', 
   };
 
-  const isEligibleForBlink = currentPlan === 'basic' || currentPlan === 'advance';
+  // লোড শেষ না হওয়া পর্যন্ত (ভুল করে) Upgrade বাটন দেখানো হবে না
+  const isEligibleForBlink = !loading && !!profile && (currentPlan === 'basic' || currentPlan === 'advance');
   const userAvatar = profile?.avatar_url || profile?.image_url || profile?.photo_url || profile?.profile_image;
   // ⏳ সীমিত সময়ের ban-এর মেয়াদ শেষ হলে আর ban ধরা হবে না (ঝাপসা পর্দাও সরে যাবে)
   const banExpired = !!profile?.ban_expires_at && new Date(profile.ban_expires_at).getTime() <= Date.now();
@@ -427,12 +428,19 @@ export default function ResellerDashboard() {
                 className="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 shrink-0"
               />
             )}
-            <div className="overflow-hidden">
-              <h4 className="font-bold text-white text-sm truncate">{profile?.full_name || 'Reseller'}</h4>
-              <span className={`text-[9px] px-2 py-0.5 rounded-full border uppercase inline-block mt-0.5 ${planBadgeStyle[currentPlan] || planBadgeStyle.basic}`}>
-                {currentPlan}
-              </span>
-            </div>
+            {loading ? (
+              <div className="space-y-2 w-full">
+                <div className="h-3.5 w-28 bg-slate-800 animate-pulse rounded-lg" />
+                <div className="h-3 w-16 bg-slate-800 animate-pulse rounded-full" />
+              </div>
+            ) : (
+              <div className="overflow-hidden">
+                <h4 className="font-bold text-white text-sm truncate">{profile?.full_name || 'Reseller'}</h4>
+                <span className={`text-[9px] px-2 py-0.5 rounded-full border uppercase inline-block mt-0.5 ${planBadgeStyle[currentPlan] || planBadgeStyle.basic}`}>
+                  {currentPlan}
+                </span>
+              </div>
+            )}
           </div>
 
           <nav className="space-y-1.5 pt-2">
@@ -555,19 +563,19 @@ export default function ResellerDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8 w-full">
           <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Pending Orders</p>
-            <h3 className="text-3xl sm:text-4xl font-black text-white mt-2">{stats.pending}</h3>
+            {loading ? <div className="h-9 w-20 bg-slate-800 animate-pulse rounded-xl mt-2" /> : <h3 className="text-3xl sm:text-4xl font-black text-white mt-2">{stats.pending}</h3>}
           </div>
           <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">In Transit / Shipped</p>
-            <h3 className="text-3xl sm:text-4xl font-black text-white mt-2">{stats.shipped}</h3>
+            {loading ? <div className="h-9 w-20 bg-slate-800 animate-pulse rounded-xl mt-2" /> : <h3 className="text-3xl sm:text-4xl font-black text-white mt-2">{stats.shipped}</h3>}
           </div>
           <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Profit Earned</p>
-            <h3 className="text-3xl sm:text-4xl font-black text-emerald-400 mt-2">৳{stats.profit}</h3>
+            {loading ? <div className="h-9 w-20 bg-slate-800 animate-pulse rounded-xl mt-2" /> : <h3 className="text-3xl sm:text-4xl font-black text-emerald-400 mt-2">৳{stats.profit}</h3>}
           </div>
           <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-md">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Received Payout</p>
-            <h3 className="text-3xl sm:text-4xl font-black text-teal-400 mt-2">৳{stats.totalPaid}</h3>
+            {loading ? <div className="h-9 w-20 bg-slate-800 animate-pulse rounded-xl mt-2" /> : <h3 className="text-3xl sm:text-4xl font-black text-teal-400 mt-2">৳{stats.totalPaid}</h3>}
           </div>
         </div>
 
@@ -575,12 +583,18 @@ export default function ResellerDashboard() {
         <div className="bg-slate-900/60 border border-slate-800 rounded-3xl shadow-xl overflow-hidden w-full">
           <div className="p-6 border-b border-slate-800/80 flex justify-between items-center">
             <h2 className="text-lg sm:text-xl font-bold text-white">Live Orders Stream</h2>
-            <span className="text-xs text-slate-400 font-semibold">{orders.length} Total Record(s)</span>
+            <span className="text-xs text-slate-400 font-semibold">{loading ? '...' : `${orders.length} Total Record(s)`}</span>
           </div>
 
           {/* Mobile Card View */}
           <div className="block lg:hidden p-4 space-y-4">
-            {orders.length === 0 ? (
+            {loading ? (
+              <div className="space-y-4">
+                {[1, 2].map((n) => (
+                  <div key={n} className="h-32 bg-slate-800/40 animate-pulse rounded-2xl" />
+                ))}
+              </div>
+            ) : orders.length === 0 ? (
               <p className="text-center text-slate-500 py-8 text-xs font-medium">No orders placed yet.</p>
             ) : (
               orders.map((o) => (
@@ -653,7 +667,15 @@ export default function ResellerDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
-                {orders.length === 0 ? (
+                {loading ? (
+                  [1, 2].map((n) => (
+                    <tr key={n}>
+                      <td colSpan={7} className="p-5">
+                        <div className="h-8 bg-slate-800/40 animate-pulse rounded-xl" />
+                      </td>
+                    </tr>
+                  ))
+                ) : orders.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-slate-500 text-xs font-medium">
                       No orders placed yet.
