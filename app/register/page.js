@@ -63,7 +63,9 @@ export default function RegisterPage() {
 
     try {
       const cleanEmail = formData.email.trim().toLowerCase();
-      const isAdmin = cleanEmail === 'admin@resellbari.com' || cleanEmail === 'admin@bbc.com' || cleanEmail === 'sujanmiah.info@gmail.com';
+
+      // 🛡️ Security: রেজিস্ট্রেশন পেজ থেকে কেউ নিজেকে admin বানাতে পারবে না।
+      // Admin role শুধু Supabase Dashboard/SQL থেকে দেওয়া হবে।
 
       // ১. Supabase Auth-এ সাইন-আপ
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -93,9 +95,9 @@ export default function RegisterPage() {
             website: formData.website || null,
             address: formData.address || null,
             district: formData.district || null,
-            role: isAdmin ? 'admin' : 'reseller',
-            plan: isAdmin ? 'basic' : null,
-            status: isAdmin ? 'active' : 'pending',
+            role: 'reseller',
+            plan: null,
+            status: 'pending',
             created_at: new Date(),
           },
         ]);
